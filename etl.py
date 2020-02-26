@@ -89,9 +89,9 @@ dep_delay_tm1 = df_merged_node['DEP_DELAY'].shift(nodes.shape[0]).apply(lambda x
 df_merged_node['ARR_DELAY'] = df_merged_node['ARR_DELAY'] + arr_delay_tm1
 df_merged_node['DEP_DELAY'] = df_merged_node['DEP_DELAY'] + dep_delay_tm1
 
-df_merged_node['MEDIAN_NODE_DELAY'] = (df_merged_node["DEP_DELAY"] + df_merged_node["ARR_DELAY"]).apply(np.median)
-df_merged_node['MEDIAN_NODE_DEP_DELAY'] = df_merged_node['DEP_DELAY'].apply(np.median)
-df_merged_node['MEDIAN_NODE_ARR_DELAY'] = df_merged_node['ARR_DELAY'].apply(np.median)
+df_merged_node['MEAN_NODE_DELAY'] = (df_merged_node["DEP_DELAY"] + df_merged_node["ARR_DELAY"]).apply(np.mean)
+df_merged_node['MEAN_NODE_DEP_DELAY'] = df_merged_node['DEP_DELAY'].apply(np.mean)
+df_merged_node['MEAN_NODE_ARR_DELAY'] = df_merged_node['ARR_DELAY'].apply(np.mean)
 df_merged_node['FL_DATE'] = pd.to_datetime(df_merged_node['FL_DATE'])
 
 df_complete = get_time_vars_node(df_merged_node, dates, hours, nodes)
