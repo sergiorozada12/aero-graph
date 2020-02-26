@@ -42,7 +42,9 @@ def filter_airports(df):
     print("Orignal number of OD pairs: ", df['OD_PAIR'].unique().shape[0])
     print("Number of OD pairs after filtering", len(valid_odpairs))
 
-    return df[df['OD_PAIR'].isin(valid_odpairs)].reset_index(drop=True), valid_odpairs
+    return df[df['OD_PAIR'].isin(valid_odpairs)].reset_index(drop=True), \
+           np.array(sorted(valid_odpairs)), \
+           np.array(sorted(airports))
 
 
 def get_season(month):
@@ -55,7 +57,7 @@ def get_season(month):
     return month
 
 
-def get_time_vars(df_, dates, hours, od_pairs):
+def get_time_vars_od(df_, dates, hours, od_pairs):
     df = pd.DataFrame()
     df['FL_DATE'] = np.repeat(dates, hours.shape[0] * od_pairs.shape[0])
     df['HOUR'] = np.tile(np.repeat(hours, od_pairs.shape[0]), dates.shape[0])
@@ -69,6 +71,17 @@ def get_time_vars(df_, dates, hours, od_pairs):
     df['QUARTER'] = df['FL_DATE'].apply(lambda d: d.quarter)
     df['YEAR'] = df['FL_DATE'].apply(lambda d: d.year)
     df['SEASON'] = df['MONTH'].apply(get_season)
+
+    return df
+
+
+def get_time_vars_node(df_, dates, hours, nodes):
+    df = pd.DataFrame()
+    df['FL_DATE'] = np.repeat(dates, hours.shape[0] * nodes.shape[0])
+    df['HOUR'] = np.tile(np.repeat(hours, nodes.shape[0]), dates.shape[0])
+    df['NODE'] = np.tile(nodes, dates.shape[0] * hours.shape[0])
+
+    df = df.merge(df_, how='left', on=['FL_DATE', 'HOUR', 'NODE'])
 
     return df
 
