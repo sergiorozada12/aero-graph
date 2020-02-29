@@ -4,12 +4,15 @@ from utils import cast_df_raw_columns
 
 from sklearn.cluster import KMeans
 
-DATA_PATH = '/home/victor/Aero_TFG/analysedData/'
-OUT_PATH = '/home/victor/Aero_TFG/modelIn/'
+DATA_PATH = 'C:/Users/victo/Aero_TFG/analysedData/'
+OUT_PATH = 'C:/Users/victo/Aero_TFG/modelIn/'
 
 df = pd.read_csv(DATA_PATH + 'signal.csv', sep='|')
 df_casted = cast_df_raw_columns(df).drop(columns=['DEP_DELAY', 'ARR_DELAY'])
 
+df_nodes = pd.read_csv(DATA_PATH + 'airport_delays.csv', sep='|')
+
+nodes = np.array(sorted(df_nodes['NODE'].unique()))
 od_pairs = np.array(sorted(df_casted['OD_PAIR'].unique()))
 dates = np.array(sorted(df_casted['FL_DATE'].unique()))
 hours = np.array(sorted(df_casted['HOUR'].unique()))
@@ -58,3 +61,8 @@ kmeans_d.fit(df_med_delays_int.values.reshape(dates.shape[0], -1))
 df_med_delays_int['DAY_CLUSTER'] = np.repeat(kmeans_d.labels_, hours.shape[0])
 
 df_med_delays_int['DAY_CLUSTER-1'] = df_med_delays_int['DAY_CLUSTER'].shift(-hours.shape[0], fill_value=1)
+
+
+######  SAVING THE DATA   ######
+
+df_med_delays_int.to_csv(OUT_PATH + 'df_med_delays.csv', sep='|')
