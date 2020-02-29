@@ -26,7 +26,7 @@ def cast_df_raw_columns(df_):
     return df
 
 
-def filter_airports(df_):
+def filter_od_pairs(df_):
     df = df_.copy()
     df['OD_PAIR'] = df['ORIGIN'] + '_' + df['DEST']
     df_odpair = pd.DataFrame(df.groupby(['ORIGIN', 'DEST', 'OD_PAIR'])['ARR_DELAY'].count()).reset_index(drop=False)
@@ -47,8 +47,33 @@ def filter_airports(df_):
            np.array(sorted(valid_odpairs)), \
            np.array(sorted(airports))
 
+def filter_airports(df_):
+    df = df_.copy()
+
+    df_dest = pd.DataFrame(df.groupby(['DEST'])['ORIGIN'].count()).reset_index(drop=False)
+    df_origin = pd.DataFrame(df.groupby(['ORIGIN'])['DEST'].count()).reset_index(drop=False)
+
+    df_origin.columns = ['ORIGIN', 'COUNT']
+    df_dest.columns = ['DEST', 'COUNT']
+
+    n_dates = df['FL_DATE'].unique().shape[0]
+    airports = []
+
+    for airport in df['ORIGIN'].unique():
+        total = df_origin[df_origin['ORIGIN'] == airport]['COUNT'] + df_dest[df_dest['DEST'] == airport]['COUNT']
+        if total.values[0]/n_dates >= 10:
+            airports.append(airport)
+
+    print("Number of days in the analysis: ", n_dates)
+    print("Original number of airports: ", df['ORIGIN'].unique().shape[0])
+    print("Number of airports after filtering: ", len(airports))
+
+    return df[df['ORIGIN'].isin(airports) & df['DEST'].isin(airports)].dropna().reset_index(drop=True), \
+           np.array(sorted(airports))
+
 def fill_list_na():
     return lambda x: x if type(x) == list else []
+
 
 def merge_and_group(df_, shift, problem_type):
     df = df_.copy()
@@ -57,29 +82,38 @@ def merge_and_group(df_, shift, problem_type):
     if problem_type == 0:
         col = 'OD_PAIR'
 
-    df_dep = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_DEP_HOUR', col])['DEP_DELAY'].agg(list)).reset_index()
-    df_arr = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_ARR_HOUR', col])['ARR_DELAY'].agg(list)).reset_index()
+    dep_del_cols = ['DEP_DELAY', 'CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
+    arr_del_cols = ['ARR_DELAY', 'CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
 
-    df_dep.columns = ['FL_DATE', 'HOUR', col, 'DEP_DELAY']
-    df_arr.columns = ['FL_DATE', 'HOUR', col, 'ARR_DELAY']
+    df_dep = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_DEP_HOUR', col])[dep_del_cols].agg(list)).reset_index()
+    df_arr = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_ARR_HOUR', col])[arr_del_cols].agg(list)).reset_index()
+
+    dep_del_cols_ = ['DEP_' + col if 'DEP_' not in col else col for col in dep_del_cols]
+    arr_del_cols_ = ['ARR_' + col if 'ARR_' not in col else col for col in dep_del_cols]
+
+    df_dep.columns = ['FL_DATE', 'HOUR', col] + dep_del_cols_
+    df_arr.columns = ['FL_DATE', 'HOUR', col] + arr_del_cols_
 
     df_merged = df_dep.merge(df_arr, how='outer', on=['FL_DATE', 'HOUR', col])
+    df_merged_shifted = df_merged.shift(shift)
 
-    df_merged['ARR_DELAY'] = df_merged['ARR_DELAY'].apply(fill_list_na())
-    df_merged['DEP_DELAY'] = df_merged['DEP_DELAY'].apply(fill_list_na())
+    for i in range(len(dep_del_cols_)):
+        general_col = 'DELAY' if i == 0 else dep_del_cols[i]
+        arr_col = arr_del_cols[i]
+        dep_col = dep_del_cols[i]
 
-    arr_delay_tm1 = df_merged['ARR_DELAY'].shift(shift).apply(fill_list_na())
-    dep_delay_tm1 = df_merged['DEP_DELAY'].shift(shift).apply(fill_list_na())
+        df_merged[arr_col] = df_merged[arr_col].apply(fill_list_na())
+        df_merged[dep_col] = df_merged[dep_col].apply(fill_list_na())
 
-    df_merged['ARR_DELAY'] = df_merged['ARR_DELAY'] + arr_delay_tm1
-    df_merged['DEP_DELAY'] = df_merged['DEP_DELAY'] + dep_delay_tm1
+        df_merged_shifted[arr_col] = df_merged_shifted[arr_col].apply(fill_list_na())
+        df_merged_shifted[dep_col] = df_merged_shifted[dep_col].apply(fill_list_na())
 
-    df_merged['MEAN_ARR_DELAY'] = df_merged['ARR_DELAY'].apply(np.mean)
-    df_merged['MEAN_DEP_DELAY'] = df_merged["DEP_DELAY"].apply(np.mean)
+        df_merged[general_col] = df_merged[arr_col] + df_merged_shifted[dep_col]
+        df_merged['MEAN_' + general_col] = df_merged[general_col].apply(np.mean)
 
     df_merged['FL_DATE'] = pd.to_datetime(df_merged['FL_DATE'])
 
-    return df
+    return df_merged
 
 
 def get_season(month):
@@ -92,11 +126,11 @@ def get_season(month):
     return month
 
 
-def get_time_vars_od(df_, dates, hours, od_pairs):
+def get_time_vars(df_, dates, hours, length):
     df = pd.DataFrame()
-    df['FL_DATE'] = np.repeat(dates, hours.shape[0] * od_pairs.shape[0])
-    df['HOUR'] = np.tile(np.repeat(hours, od_pairs.shape[0]), dates.shape[0])
-    df['OD_PAIR'] = np.tile(od_pairs, dates.shape[0] * hours.shape[0])
+    df['FL_DATE'] = np.repeat(dates, hours.shape[0] * length)
+    df['HOUR'] = np.tile(np.repeat(hours, length), dates.shape[0])
+    df['OD_PAIR'] = np.tile(length, dates.shape[0] * hours.shape[0])
 
     df = df.merge(df_, how='left', on=['FL_DATE', 'HOUR', 'OD_PAIR'])
 
@@ -110,20 +144,9 @@ def get_time_vars_od(df_, dates, hours, od_pairs):
     return df
 
 
-def get_time_vars_node(df_, dates, hours, nodes):
-    df = pd.DataFrame()
-    df['FL_DATE'] = np.repeat(dates, hours.shape[0] * nodes.shape[0])
-    df['HOUR'] = np.tile(np.repeat(hours, nodes.shape[0]), dates.shape[0])
-    df['NODE'] = np.tile(nodes, dates.shape[0] * hours.shape[0])
-
-    df = df.merge(df_, how='left', on=['FL_DATE', 'HOUR', 'NODE'])
-
-    return df
-
-
-def get_label(df, th, h, od_pairs)
-    df['y_reg'] = df['MEDIAN_DEP_DELAY'].fillna(v).shift(-h*od_pairs.shape[0]).fillna(-1)
-    df['y_clas'] = 1*(df_shifted.values >= th)
+def get_label(df, th, h, length)
+    df['y_reg'] = df['MEDIAN_DEP_DELAY'].fillna(0.0).shift(-h*length).fillna(-1)
+    df['y_clas'] = 1*(df['y_reg'].values >= th)
 
     return df
 
