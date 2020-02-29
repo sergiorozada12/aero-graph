@@ -1,18 +1,23 @@
 import pandas as pd
 import os
 import numpy as np
+import zipfile
 
 
 def load_df_from_raw_files(path):
-    dfs = []
+    df = pd.DataFrame()
 
-    for dir_name, dirs, files in os.walk(path):
-        for d in dirs:
-            filename = os.listdir(os.path.join(dir_name, d))[0]
-            full_path = os.path.join(dir_name, d, filename)
-            df_aux = pd.read_csv(full_path)
-            dfs.append(df_aux)
-    return pd.concat(dfs)
+    for file in os.listdir(path):
+        zfile = zipfile.ZipFile(path + file)
+        df = pd.concat([df, pd.read_csv(zfile.open(zfile.infolist()[0].filename))], sort=True)
+
+    cols_delay_type = ['CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
+    df[cols_delay_type] = df[cols_delay_type].fillna(0.0)
+
+    print("Data loaded, shape: ", df.shape)
+    print("----------------------------------------")
+
+    return df.drop(columns=['Unnamed: 20'])
 
 
 def cast_df_raw_columns(df_):
@@ -42,10 +47,12 @@ def filter_od_pairs(df_):
     print("Number of airports after filtering: ", len(airports))
     print("Orignal number of OD pairs: ", df['OD_PAIR'].unique().shape[0])
     print("Number of OD pairs after filtering", len(valid_odpairs))
+    print("----------------------------------------")
 
     return df[df['OD_PAIR'].isin(valid_odpairs)].reset_index(drop=True), \
            np.array(sorted(valid_odpairs)), \
            np.array(sorted(airports))
+
 
 def filter_airports(df_):
     df = df_.copy()
@@ -67,9 +74,11 @@ def filter_airports(df_):
     print("Number of days in the analysis: ", n_dates)
     print("Original number of airports: ", df['ORIGIN'].unique().shape[0])
     print("Number of airports after filtering: ", len(airports))
+    print("----------------------------------------")
 
     return df[df['ORIGIN'].isin(airports) & df['DEST'].isin(airports)].dropna().reset_index(drop=True), \
            np.array(sorted(airports))
+
 
 def fill_list_na():
     return lambda x: x if type(x) == list else []
@@ -99,8 +108,8 @@ def merge_and_group(df_, shift, problem_type):
 
     for i in range(len(dep_del_cols_)):
         general_col = 'DELAY' if i == 0 else dep_del_cols[i]
-        arr_col = arr_del_cols[i]
-        dep_col = dep_del_cols[i]
+        arr_col = arr_del_cols_[i]
+        dep_col = dep_del_cols_[i]
 
         df_merged[arr_col] = df_merged[arr_col].apply(fill_list_na())
         df_merged[dep_col] = df_merged[dep_col].apply(fill_list_na())
@@ -112,6 +121,9 @@ def merge_and_group(df_, shift, problem_type):
         df_merged['MEAN_' + general_col] = df_merged[general_col].apply(np.mean)
 
     df_merged['FL_DATE'] = pd.to_datetime(df_merged['FL_DATE'])
+
+    print("Merged and grouped")
+    print("----------------------------------------")
 
     return df_merged
 
@@ -144,11 +156,12 @@ def get_time_vars(df_, dates, hours, length):
     return df
 
 
-def get_label(df, th, h, length)
+def get_label(df, th, h, length):
     df['y_reg'] = df['MEDIAN_DEP_DELAY'].fillna(0.0).shift(-h*length).fillna(-1)
     df['y_clas'] = 1*(df['y_reg'].values >= th)
 
     return df
+
 
 def get_hour(df_):
     df = df_.copy()

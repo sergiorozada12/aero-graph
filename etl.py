@@ -3,8 +3,8 @@ import numpy as np
 
 import utils as u
 
-DATA_PATH = '/home/victor/Aero_TFG/Data'
-OUT_PATH = '/home/victor/Aero_TFG/analysedData/'
+DATA_PATH = '/home/sergio/code/aero-graph/raw_data/'
+OUT_PATH = '/home/sergio/code/aero-graph/data/'
 
 N_MOST_DELAYED = 100
 
@@ -26,15 +26,21 @@ df_filt_airports = u.get_hour(df_filt_airports)
 dates = pd.to_datetime(df_filt_od_pairs['FL_DATE'].unique()).sort_values()
 hours = np.sort(df_filt_od_pairs['CRS_ARR_HOUR'].unique())
 
-# OD-PAIRS
+print("OD-PAIRS pipeline")
+print("----------------------------------------")
 df_merged_od_pairs = u.merge_and_group(df_filt_od_pairs, shift=od_pairs.shape[0], problem_type=0)
 df_od_pairs = u.get_time_vars(df_merged_od_pairs, dates, hours, od_pairs.shape[0]).drop(columns=['MONTH'], inplace=True)
 df_final_od_pairs = u.get_label(df_od_pairs, TH, H, od_pairs.shape[0])
-df_final_od_pairs.to_csv(OUT_PATH + 'signal.csv', sep='|', index=False, index_label=False)
+df_final_od_pairs.to_csv(OUT_PATH + 'dataset_od_pairs.csv', sep='|', index=False, index_label=False)
+print("DONE")
+print("----------------------------------------")
 
-# AIRPORTS
+print("AIRPORTS pipeline")
+print("----------------------------------------")
 df_merged_node = u.merge_and_group(df_filt_airports, shift=nodes_airports.shape[0], problem_type=1)
 df_nodes = u.get_time_vars(df_merged_node, dates, hours, nodes_airports.shape[0])
 df_final_nodes = u.get_label(df_nodes, TH, H, nodes_airports.shape[0])
 df_final_nodes.drop(columns=['DEP_DELAY', 'ARR_DELAY'])\
-    .to_csv(OUT_PATH + 'airport_delays.csv', sep='|', index=False, index_label=False)
+    .to_csv(OUT_PATH + 'dataset_airports.csv', sep='|', index=False, index_label=False)
+print("DONE")
+print("----------------------------------------")
