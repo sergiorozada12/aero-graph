@@ -26,7 +26,8 @@ def cast_df_raw_columns(df_):
     return df
 
 
-def filter_airports(df):
+def filter_airports(df_):
+    df = df_.copy()
     df['OD_PAIR'] = df['ORIGIN'] + '_' + df['DEST']
     df_odpair = pd.DataFrame(df.groupby(['ORIGIN', 'DEST', 'OD_PAIR'])['ARR_DELAY'].count()).reset_index(drop=False)
     df_odpair.columns = ['ORIGIN', 'DEST', 'OD_PAIR', 'COUNT']
@@ -34,7 +35,7 @@ def filter_airports(df):
     n_dates = df['FL_DATE'].unique().shape[0]
     df_valid_odpairs = df_odpair.loc[df_odpair['COUNT'] >= 10 * n_dates]
     valid_odpairs = df_valid_odpairs['OD_PAIR'].tolist()
-    airports = (pd.concat([gb_cons['ORIGIN'], gb_cons['DEST']])).unique().tolist()
+    airports = (pd.concat([df_valid_odpairs['ORIGIN'], df_valid_odpairs['DEST']])).unique().tolist()
 
     print("Number of days in the analysis: ", n_dates)
     print("Original number of airports: ", pd.concat([df['ORIGIN'], df['DEST']]).unique().shape[0])
@@ -45,6 +46,40 @@ def filter_airports(df):
     return df[df['OD_PAIR'].isin(valid_odpairs)].reset_index(drop=True), \
            np.array(sorted(valid_odpairs)), \
            np.array(sorted(airports))
+
+def fill_list_na():
+    return lambda x: x if type(x) == list else []
+
+def merge_and_group(df_, shift, problem_type):
+    df = df_.copy()
+
+    col = 'NODE'
+    if problem_type == 0:
+        col = 'OD_PAIR'
+
+    df_dep = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_DEP_HOUR', col])['DEP_DELAY'].agg(list)).reset_index()
+    df_arr = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_ARR_HOUR', col])['ARR_DELAY'].agg(list)).reset_index()
+
+    df_dep.columns = ['FL_DATE', 'HOUR', col, 'DEP_DELAY']
+    df_arr.columns = ['FL_DATE', 'HOUR', col, 'ARR_DELAY']
+
+    df_merged = df_dep.merge(df_arr, how='outer', on=['FL_DATE', 'HOUR', col])
+
+    df_merged['ARR_DELAY'] = df_merged['ARR_DELAY'].apply(fill_list_na())
+    df_merged['DEP_DELAY'] = df_merged['DEP_DELAY'].apply(fill_list_na())
+
+    arr_delay_tm1 = df_merged['ARR_DELAY'].shift(shift).apply(fill_list_na())
+    dep_delay_tm1 = df_merged['DEP_DELAY'].shift(shift).apply(fill_list_na())
+
+    df_merged['ARR_DELAY'] = df_merged['ARR_DELAY'] + arr_delay_tm1
+    df_merged['DEP_DELAY'] = df_merged['DEP_DELAY'] + dep_delay_tm1
+
+    df_merged['MEAN_ARR_DELAY'] = df_merged['ARR_DELAY'].apply(np.mean)
+    df_merged['MEAN_DEP_DELAY'] = df_merged["DEP_DELAY"].apply(np.mean)
+
+    df_merged['FL_DATE'] = pd.to_datetime(df_merged['FL_DATE'])
+
+    return df
 
 
 def get_season(month):
@@ -89,5 +124,15 @@ def get_time_vars_node(df_, dates, hours, nodes):
 def get_label(df, th, h, od_pairs)
     df['y_reg'] = df['MEDIAN_DEP_DELAY'].fillna(v).shift(-h*od_pairs.shape[0]).fillna(-1)
     df['y_clas'] = 1*(df_shifted.values >= th)
+
+    return df
+
+def get_hour(df_):
+    df = df_.copy()
+    df['CRS_ARR_HOUR'] = df['CRS_ARR_TIME'].apply(lambda x: int(x // 100)).apply(lambda x: 0 if x == 24 else x)
+    df['CRS_DEP_HOUR'] = df['CRS_DEP_TIME'].apply(lambda x: int(x // 100)).apply(lambda x: 0 if x == 24 else x)
+
+    df['ARR_HOUR'] = df['ARR_TIME'].apply(lambda x: int(x // 100)).apply(lambda x: 0 if x == 24 else x)
+    df['DEP_HOUR'] = df['DEP_TIME'].apply(lambda x: int(x // 100)).apply(lambda x: 0 if x == 24 else x)
 
     return df
