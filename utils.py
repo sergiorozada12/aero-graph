@@ -6,6 +6,7 @@ import zipfile
 OD_PAIR = 0
 NODE = 1
 
+
 def load_df_from_raw_files(path):
     df = pd.DataFrame()
 
@@ -87,39 +88,56 @@ def fill_list_na():
     return lambda x: x if type(x) == list else []
 
 
-def merge_and_group(df_, shift, problem_type):
+def merge_and_group(df_, problem_type):
     df = df_.copy()
-
-    if problem_type == OD_PAIR:
-        col = 'OD_PAIR'
-        orig = 'OD_PAIR'
-        dest = 'OD_PAIR'
-    elif problem_type == NODE:
-        col = 'NODE'
-        orig = 'ORIGIN'
-        dest = 'DEST'
-    else:
-        raise RuntimeError("Unknown problem type")
 
     dep_del_cols = ['DEP_DELAY', 'CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
     arr_del_cols = ['ARR_DELAY', 'CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
 
-    df_dep = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_DEP_HOUR', orig])[dep_del_cols].agg(list)).reset_index()
-    df_arr = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_ARR_HOUR', dest])[arr_del_cols].agg(list)).reset_index()
-
     dep_del_cols_ = ['DEP_' + col if 'DEP_' not in col else col for col in dep_del_cols]
     arr_del_cols_ = ['ARR_' + col if 'ARR_' not in col else col for col in arr_del_cols]
 
-    df_dep.columns = ['FL_DATE', 'HOUR', col] + dep_del_cols_
-    df_arr.columns = ['FL_DATE', 'HOUR', col] + arr_del_cols_
+    if problem_type == OD_PAIR:
+        df_dep = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_DEP_HOUR', 'OD_PAIR'])[dep_del_cols].agg(list)).reset_index()
+        df_arr = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_ARR_HOUR', 'OD_PAIR'])[arr_del_cols].agg(list)).reset_index()
 
-    df_merged = df_dep.merge(df_arr, how='outer', on=['FL_DATE', 'HOUR', col])
-    df_merged_shifted = df_merged.shift(shift)
+        df_dep.columns = ['FL_DATE', 'HOUR', 'OD_PAIR'] + dep_del_cols_
+        df_arr.columns = ['FL_DATE', 'HOUR', 'OD_PAIR'] + arr_del_cols_
+
+        df_merged = df_dep.merge(df_arr, how='outer', on=['FL_DATE', 'HOUR', 'OD_PAIR'])
+
+    else:
+        df_dep = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_DEP_HOUR', 'ORIGIN'])[dep_del_cols].agg(list)).reset_index()
+        df_arr = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_ARR_HOUR', 'DEST'])[arr_del_cols].agg(list)).reset_index()
+
+        df_dep.columns = ['FL_DATE', 'HOUR', 'NODE'] + dep_del_cols_
+        df_arr.columns = ['FL_DATE', 'HOUR', 'NODE'] + arr_del_cols_
+
+        df_merged = df_dep.merge(df_arr, how='outer', on=['FL_DATE', 'HOUR', 'NODE'])
+
+    print("Merged and grouped")
+    print("----------------------------------------")
+
+    return df_merged
+
+
+def obtain_avg_delay(df, shift):
+    df_merged = df.copy()
+
+    dep_del_cols = ['DEP_DELAY', 'CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
+    arr_del_cols = ['ARR_DELAY', 'CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
+
+    dep_del_cols_ = ['DEP_' + col if 'DEP_' not in col else col for col in dep_del_cols]
+    arr_del_cols_ = ['ARR_' + col if 'ARR_' not in col else col for col in arr_del_cols]
 
     for i in range(len(dep_del_cols_)):
         general_col = 'DELAY' if i == 0 else dep_del_cols[i]
         arr_col = arr_del_cols_[i]
         dep_col = dep_del_cols_[i]
+
+        print(general_col)
+
+        df_merged_shifted = df_merged[[arr_col, dep_col]].shift(shift)
 
         df_merged[arr_col] = df_merged[arr_col].apply(fill_list_na())
         df_merged[dep_col] = df_merged[dep_col].apply(fill_list_na())
@@ -127,14 +145,16 @@ def merge_and_group(df_, shift, problem_type):
         df_merged_shifted[arr_col] = df_merged_shifted[arr_col].apply(fill_list_na())
         df_merged_shifted[dep_col] = df_merged_shifted[dep_col].apply(fill_list_na())
 
-        df_merged[general_col] = df_merged[arr_col] + df_merged_shifted[dep_col]
+        df_merged[general_col] = df_merged[arr_col] + \
+                                 df_merged[dep_col] + \
+                                 df_merged_shifted[arr_col] + \
+                                 df_merged_shifted[dep_col]
         df_merged['MEAN_' + general_col] = df_merged[general_col].apply(np.mean)
 
     df_merged['FL_DATE'] = pd.to_datetime(df_merged['FL_DATE'])
 
-    print("Merged and grouped")
+    print("Mean delays estimated")
     print("----------------------------------------")
-    print(df_merged.columns)
 
     return df_merged
 
@@ -149,7 +169,7 @@ def get_season(month):
     return month
 
 
-def get_time_vars(df_, dates, hours, elems, col):
+def get_time_vars(df_, dates, hours, elements, col):
     df = pd.DataFrame()
     df['FL_DATE'] = np.repeat(dates, hours.shape[0] * elems.shape[0])
     df['HOUR'] = np.tile(np.repeat(hours, elems.shape[0]), dates.shape[0])
@@ -185,38 +205,40 @@ def get_hour(df_):
     return df
 
 
-def create_od_pair_graph(df_, od_pairs):
-    A = np.zeros([od_pairs.shape[0], od_pairs.shape[0]])
+def create_od_pair_graph(od_pairs, path):
+
+    adj = np.zeros([od_pairs.shape[0], od_pairs.shape[0]])
 
     for i, od_i in enumerate(od_pairs):
         for j, od_j in enumerate(od_pairs):
-            if od_i.split('_')[0] == od_j.split('_')[0] or\
-                od_i.split('_')[0] == od_j.split('_')[1] or\
-                od_i.split('_')[1] == od_j.split('_')[0] or\
-                od_i.split('_')[1] == od_j.split('_')[1]:
-                
-                A[i, j] = 1
+            if od_i.split('_')[0] == od_j.split('_')[0] | od_i.split('_')[0] == od_j.split('_')[1] | \
+                    od_i.split('_')[1] == od_j.split('_')[0] | od_i.split('_')[1] == od_j.split('_')[1]:
+                adj[i, j] = 1
 
-    D = np.diag((A.T@A).diagonal())
-    L = D - A
+    degree = np.diag((adj.T@adj).diagonal())
+    laplacian = degree - adj
 
-    return A, L
+    np.save(path + "graph/Adj_OD", adj)
+    np.save(path + "graph/Lap_OD", laplacian)
 
 
-def create_airport_graph(df_, nodes):
+def create_airport_graph(df_, nodes, path):
     edges = df_[['ORIGIN', 'DEST']].drop_duplicates()
     weights = df_.groupby(['ORIGIN', 'DEST']).count()
 
-    A = np.zeros([nodes.shape[0], nodes.shape[0]])
-    A_w = np.zeros([nodes.shape[0], nodes.shape[0]])
+    adj = np.zeros([nodes.shape[0], nodes.shape[0]])
+    adj_weighted = np.zeros([nodes.shape[0], nodes.shape[0]])
 
     for i, node_i in enumerate(nodes):
         for j, node_j in enumerate(nodes):
             if any((edges['ORIGIN'] == node_i) & (edges['DEST'] == node_j)):
-                A[i, j] = 1
-                A_w[i, j] = weights.loc[node_i, node_j][0]
+                adj[i, j] = 1
+                adj_weighted[i, j] = weights.loc[node_i, node_j][0]
 
-    D = np.diag((A.T@A).diagonal())
-    L = D - A
+    degree = np.diag((adj.T@adj).diagonal())
+    laplacian = degree - adj
 
-    return A, A_w, L
+    np.save(path + "graph/Adj_nodes", adj)
+    np.save(path + "graph/Adj_w_nodes", adj_weighted)
+    np.save(path + "graph/Lap_nodes", laplacian)
+
