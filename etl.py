@@ -3,8 +3,11 @@ import numpy as np
 
 import utils as u
 
-DATA_PATH = '/home/sergio/code/aero-graph/raw_data/'
-OUT_PATH = '/home/sergio/code/aero-graph/data/'
+# DATA_PATH = '/home/sergio/code/aero-graph/raw_data/'
+# OUT_PATH = '/home/sergio/code/aero-graph/data/'
+DATA_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\raw_data\\"
+OUT_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\data\\"
+
 
 N_MOST_DELAYED = 100
 
@@ -26,21 +29,32 @@ df_filt_airports = u.get_hour(df_filt_airports)
 dates = pd.to_datetime(df_filt_od_pairs['FL_DATE'].unique()).sort_values()
 hours = np.sort(df_filt_od_pairs['CRS_ARR_HOUR'].unique())
 
-print("OD-PAIRS pipeline")
+print("AIRPORTS pipeline")
 print("----------------------------------------")
-df_merged_od_pairs = u.merge_and_group(df_filt_od_pairs, shift=od_pairs.shape[0], problem_type=0)
-df_od_pairs = u.get_time_vars(df_merged_od_pairs, dates, hours, od_pairs.shape[0]).drop(columns=['MONTH'], inplace=True)
-df_final_od_pairs = u.get_label(df_od_pairs, TH, H, od_pairs.shape[0])
-df_final_od_pairs.to_csv(OUT_PATH + 'dataset_od_pairs.csv', sep='|', index=False, index_label=False)
+A_node, A_w_node, L_node = u.create_airport_graph(df_filt_airports, nodes_airports)
+df_merged_node = u.merge_and_group(df_filt_airports, shift=nodes_airports.shape[0], problem_type=u.NODE)
+df_nodes = u.get_time_vars(df_merged_node, dates, hours, nodes_airports, 'NODE').drop(columns=['MONTH'])
+df_final_nodes = u.get_label(df_nodes, TH, H, nodes_airports.shape[0])
+
+df_final_nodes.drop(columns=['DEP_DELAY', 'ARR_DELAY'])\
+    .to_csv(OUT_PATH + 'dataset_airports.csv', sep='|', index=False, index_label=False)
+np.save(OUT_PATH + "graph/Adj_nodes", A_node)
+np.save(OUT_PATH + "graph/Adj_w_nodes", A_w_node)
+np.save(OUT_PATH + "graph/Lap_nodes", L_node)
 print("DONE")
 print("----------------------------------------")
 
-print("AIRPORTS pipeline")
+print("OD-PAIRS pipeline")
 print("----------------------------------------")
-df_merged_node = u.merge_and_group(df_filt_airports, shift=nodes_airports.shape[0], problem_type=1)
-df_nodes = u.get_time_vars(df_merged_node, dates, hours, nodes_airports.shape[0])
-df_final_nodes = u.get_label(df_nodes, TH, H, nodes_airports.shape[0])
-df_final_nodes.drop(columns=['DEP_DELAY', 'ARR_DELAY'])\
-    .to_csv(OUT_PATH + 'dataset_airports.csv', sep='|', index=False, index_label=False)
+A_od, L_od = u.create_od_pair_graph(df_filt_od_pairs, od_pairs)
+df_merged_od_pairs = u.merge_and_group(df_filt_od_pairs, shift=od_pairs.shape[0], problem_type=u.OD_PAIR)
+df_od_pairs = u.get_time_vars(df_merged_od_pairs, dates, hours, od_pairs, 'OD_PAIR').drop(columns=['MONTH'])
+df_final_od_pairs = u.get_label(df_od_pairs, TH, H, od_pairs.shape[0])
+
+df_final_od_pairs.to_csv(OUT_PATH + 'dataset_od_pairs.csv', sep='|', index=False, index_label=False)
+np.save(OUT_PATH + "graph/Adj_OD", A_od)
+np.save(OUT_PATH + "graph/Lap_OD", L_od)
 print("DONE")
 print("----------------------------------------")
+
+

@@ -3,6 +3,8 @@ import os
 import numpy as np
 import zipfile
 
+OD_PAIR = 0
+NODE = 1
 
 def load_df_from_raw_files(path):
     df = pd.DataFrame()
@@ -17,7 +19,8 @@ def load_df_from_raw_files(path):
     print("Data loaded, shape: ", df.shape)
     print("----------------------------------------")
 
-    return df.drop(columns=['Unnamed: 20'])
+    unnamed_cols = [col for col in df.columns if 'Unnamed' in col]
+    return df.drop(columns=unnamed_cols)
 
 
 def cast_df_raw_columns(df_):
@@ -87,18 +90,25 @@ def fill_list_na():
 def merge_and_group(df_, shift, problem_type):
     df = df_.copy()
 
-    col = 'NODE'
-    if problem_type == 0:
+    if problem_type == OD_PAIR:
         col = 'OD_PAIR'
+        orig = 'OD_PAIR'
+        dest = 'OD_PAIR'
+    elif problem_type == NODE:
+        col = 'NODE'
+        orig = 'ORIGIN'
+        dest = 'DEST'
+    else:
+        raise RuntimeError("Unknown problem type")
 
     dep_del_cols = ['DEP_DELAY', 'CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
     arr_del_cols = ['ARR_DELAY', 'CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
 
-    df_dep = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_DEP_HOUR', col])[dep_del_cols].agg(list)).reset_index()
-    df_arr = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_ARR_HOUR', col])[arr_del_cols].agg(list)).reset_index()
+    df_dep = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_DEP_HOUR', orig])[dep_del_cols].agg(list)).reset_index()
+    df_arr = pd.DataFrame(df.groupby(['FL_DATE', 'CRS_ARR_HOUR', dest])[arr_del_cols].agg(list)).reset_index()
 
     dep_del_cols_ = ['DEP_' + col if 'DEP_' not in col else col for col in dep_del_cols]
-    arr_del_cols_ = ['ARR_' + col if 'ARR_' not in col else col for col in dep_del_cols]
+    arr_del_cols_ = ['ARR_' + col if 'ARR_' not in col else col for col in arr_del_cols]
 
     df_dep.columns = ['FL_DATE', 'HOUR', col] + dep_del_cols_
     df_arr.columns = ['FL_DATE', 'HOUR', col] + arr_del_cols_
@@ -124,6 +134,7 @@ def merge_and_group(df_, shift, problem_type):
 
     print("Merged and grouped")
     print("----------------------------------------")
+    print(df_merged.columns)
 
     return df_merged
 
@@ -138,13 +149,13 @@ def get_season(month):
     return month
 
 
-def get_time_vars(df_, dates, hours, length):
+def get_time_vars(df_, dates, hours, elems, col):
     df = pd.DataFrame()
-    df['FL_DATE'] = np.repeat(dates, hours.shape[0] * length)
-    df['HOUR'] = np.tile(np.repeat(hours, length), dates.shape[0])
-    df['OD_PAIR'] = np.tile(length, dates.shape[0] * hours.shape[0])
+    df['FL_DATE'] = np.repeat(dates, hours.shape[0] * elems.shape[0])
+    df['HOUR'] = np.tile(np.repeat(hours, elems.shape[0]), dates.shape[0])
+    df[col] = np.tile(elems, dates.shape[0] * hours.shape[0])
 
-    df = df.merge(df_, how='left', on=['FL_DATE', 'HOUR', 'OD_PAIR'])
+    df = df.merge(df_, how='left', on=['FL_DATE', 'HOUR', col])
 
     df['DAY'] = df['FL_DATE'].apply(lambda d: d.day)
     df['DAY_OF_WEEK'] = df['FL_DATE'].apply(lambda d: d.dayofweek)
@@ -157,7 +168,7 @@ def get_time_vars(df_, dates, hours, length):
 
 
 def get_label(df, th, h, length):
-    df['y_reg'] = df['MEDIAN_DEP_DELAY'].fillna(0.0).shift(-h*length).fillna(-1)
+    df['y_reg'] = df['MEAN_DELAY'].fillna(0.0).shift(-h*length).fillna(-1)
     df['y_clas'] = 1*(df['y_reg'].values >= th)
 
     return df
@@ -172,3 +183,40 @@ def get_hour(df_):
     df['DEP_HOUR'] = df['DEP_TIME'].apply(lambda x: int(x // 100)).apply(lambda x: 0 if x == 24 else x)
 
     return df
+
+
+def create_od_pair_graph(df_, od_pairs):
+    A = np.zeros([od_pairs.shape[0], od_pairs.shape[0]])
+
+    for i, od_i in enumerate(od_pairs):
+        for j, od_j in enumerate(od_pairs):
+            if od_i.split('_')[0] == od_j.split('_')[0] or\
+                od_i.split('_')[0] == od_j.split('_')[1] or\
+                od_i.split('_')[1] == od_j.split('_')[0] or\
+                od_i.split('_')[1] == od_j.split('_')[1]:
+                
+                A[i, j] = 1
+
+    D = np.diag((A.T@A).diagonal())
+    L = D - A
+
+    return A, L
+
+
+def create_airport_graph(df_, nodes):
+    edges = df_[['ORIGIN', 'DEST']].drop_duplicates()
+    weights = df_.groupby(['ORIGIN', 'DEST']).count()
+
+    A = np.zeros([nodes.shape[0], nodes.shape[0]])
+    A_w = np.zeros([nodes.shape[0], nodes.shape[0]])
+
+    for i, node_i in enumerate(nodes):
+        for j, node_j in enumerate(nodes):
+            if any((edges['ORIGIN'] == node_i) & (edges['DEST'] == node_j)):
+                A[i, j] = 1
+                A_w[i, j] = weights.loc[node_i, node_j][0]
+
+    D = np.diag((A.T@A).diagonal())
+    L = D - A
+
+    return A, A_w, L

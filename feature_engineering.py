@@ -4,13 +4,13 @@ from utils import cast_df_raw_columns
 
 from sklearn.cluster import KMeans
 
-DATA_PATH = 'C:/Users/victo/Aero_TFG/analysedData/'
+DATA_PATH = 'C:/Users/victor/Aero_TFG/data/'
 OUT_PATH = 'C:/Users/victo/Aero_TFG/modelIn/'
 
-df = pd.read_csv(DATA_PATH + 'signal.csv', sep='|')
+df = pd.read_csv(DATA_PATH + 'dataset_od_pairs.csv', sep='|')
 df_casted = cast_df_raw_columns(df).drop(columns=['DEP_DELAY', 'ARR_DELAY'])
 
-df_nodes = pd.read_csv(DATA_PATH + 'airport_delays.csv', sep='|')
+df_nodes = pd.read_csv(DATA_PATH + 'dataset_airports.csv', sep='|')
 
 nodes = np.array(sorted(df_nodes['NODE'].unique()))
 od_pairs = np.array(sorted(df_casted['OD_PAIR'].unique()))
