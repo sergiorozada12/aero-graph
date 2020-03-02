@@ -135,7 +135,7 @@ def obtain_avg_delay(df, shift):
         arr_col = arr_del_cols_[i]
         dep_col = dep_del_cols_[i]
 
-        print(general_col)
+        print("Resumming column: ", general_col)
 
         df_merged_shifted = df_merged[[arr_col, dep_col]].shift(shift)
 
@@ -150,6 +150,7 @@ def obtain_avg_delay(df, shift):
                                  df_merged_shifted[arr_col] + \
                                  df_merged_shifted[dep_col]
         df_merged['MEAN_' + general_col] = df_merged[general_col].apply(np.mean)
+        df_merged['MEDIAN_' + general_col] = df_merged[general_col].apply(np.median)
 
     df_merged['FL_DATE'] = pd.to_datetime(df_merged['FL_DATE'])
 
@@ -171,9 +172,9 @@ def get_season(month):
 
 def get_time_vars(df_, dates, hours, elements, col):
     df = pd.DataFrame()
-    df['FL_DATE'] = np.repeat(dates, hours.shape[0] * elems.shape[0])
-    df['HOUR'] = np.tile(np.repeat(hours, elems.shape[0]), dates.shape[0])
-    df[col] = np.tile(elems, dates.shape[0] * hours.shape[0])
+    df['FL_DATE'] = np.repeat(dates, hours.shape[0] * elements.shape[0])
+    df['HOUR'] = np.tile(np.repeat(hours, elements.shape[0]), dates.shape[0])
+    df[col] = np.tile(elements, dates.shape[0] * hours.shape[0])
 
     df = df.merge(df_, how='left', on=['FL_DATE', 'HOUR', col])
 
