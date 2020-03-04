@@ -3,6 +3,8 @@ import os
 import numpy as np
 import zipfile
 
+from sklearn.cluster import KMeans
+
 OD_PAIR = 0
 NODE = 1
 
@@ -145,12 +147,17 @@ def obtain_avg_delay(df, shift):
         df_merged_shifted[arr_col] = df_merged_shifted[arr_col].apply(fill_list_na())
         df_merged_shifted[dep_col] = df_merged_shifted[dep_col].apply(fill_list_na())
 
-        df_merged[general_col] = df_merged[arr_col] + \
-                                 df_merged[dep_col] + \
-                                 df_merged_shifted[arr_col] + \
-                                 df_merged_shifted[dep_col]
+        df_merged['DEP_' + general_col] = df_merged[dep_col] + df_merged_shifted[dep_col]
+        df_merged['ARR_' + general_col] = df_merged[arr_col] + df_merged_shifted[arr_col]
+
+        df_merged[general_col] = df_merged['DEP_' + general_col] + \
+                                 df_merged['ARR_' + general_col]
         df_merged['MEAN_' + general_col] = df_merged[general_col].apply(np.mean)
         df_merged['MEDIAN_' + general_col] = df_merged[general_col].apply(np.median)
+
+        if general_col == 'DELAY':
+            df_merged['MEAN_DEP_DELAY'] = df_merged['DEP_DELAY'].apply(np.mean)
+            df_merged['MEAN_ARR_DELAY'] = df_merged['ARR_DELAY'].apply(np.mean)
 
     df_merged['FL_DATE'] = pd.to_datetime(df_merged['FL_DATE'])
 
@@ -209,18 +216,22 @@ def get_hour(df_):
 def create_od_pair_graph(od_pairs, path):
 
     adj = np.zeros([od_pairs.shape[0], od_pairs.shape[0]])
+    edges = []
 
     for i, od_i in enumerate(od_pairs):
         for j, od_j in enumerate(od_pairs):
-            if od_i.split('_')[0] == od_j.split('_')[0] | od_i.split('_')[0] == od_j.split('_')[1] | \
-                    od_i.split('_')[1] == od_j.split('_')[0] | od_i.split('_')[1] == od_j.split('_')[1]:
+            if od_i.split('_')[0] == od_j.split('_')[0] or od_i.split('_')[0] == od_j.split('_')[1] or \
+                    od_i.split('_')[1] == od_j.split('_')[0] or od_i.split('_')[1] == od_j.split('_')[1]:
                 adj[i, j] = 1
+                edges.append([od_i, od_j])
+
 
     degree = np.diag((adj.T@adj).diagonal())
     laplacian = degree - adj
 
     np.save(path + "graph/Adj_OD", adj)
     np.save(path + "graph/Lap_OD", laplacian)
+    np.save(path + "graph/edges_od_pairs", np.array(edges))
 
 
 def create_airport_graph(df_, nodes, path):
@@ -242,4 +253,50 @@ def create_airport_graph(df_, nodes, path):
     np.save(path + "graph/Adj_nodes", adj)
     np.save(path + "graph/Adj_w_nodes", adj_weighted)
     np.save(path + "graph/Lap_nodes", laplacian)
+    np.save(path + "graph/edges_nodes", edges.values)
 
+
+
+########################################################
+########    UTILS FOR FEATURE ENGINEERING   ############
+########################################################
+
+def get_features_df(df, df_nodes, od_pairs, nodes):
+    avg_delays_od_pairs = df['MEAN_DELAY'].values.reshape(-1, od_pairs.shape[0]).astype(np.float32)
+    df_od_avg_delays = pd.DataFrame(avg_delays_od_pairs, columns=od_pairs)
+
+    avg_delays_nodes_dep = df_nodes['MEAN_DELAY'].values.reshape(-1, nodes.shape[0]).astype(np.float32)
+    avg_delays_nodes_arr = df_nodes['MEAN_DELAY'].values.reshape(-1, nodes.shape[0]).astype(np.float32)
+
+    cols_dep = [n + '_DEPAR' for n in nodes]
+    cols_arr = [n + '_ARRIV' for n in nodes]
+
+    df_node_avg_delays = pd.concat([pd.DataFrame(avg_delays_nodes_dep, columns=cols_dep),
+                                    pd.DataFrame(avg_delays_nodes_arr, columns=cols_arr)], axis=1)
+
+    return pd.concat([df_od_avg_delays, df_node_avg_delays], axis=1)
+
+
+def apply_clustering(df_, n_clust, n_dates, n_hours, random_state=None):
+    df = df_.copy()
+    kmeans_h = KMeans(n_clusters=n_clust, random_state=random_state)
+    kmeans_h.fit(df.values)
+    df['HOUR_CLUSTER'] = kmeans_h.labels_
+
+    kmeans_d = KMeans(n_clusters=n_clust, random_state=random_state)
+    kmeans_d.fit(df.values.reshape(n_dates, -1))
+    df['DAY_CLUSTER'] = np.repeat(kmeans_d.labels_, n_hours)
+
+    df['DAY_CLUSTER-1'] = df['DAY_CLUSTER'].shift(-n_hours, fill_value=1)
+
+    return df
+
+def treat_delay_type(d_type, df_, elems, col, edges):
+
+    df = df_.copy()
+    for el in elems:
+        df[el + '_MEAN_' + d_type] = np.repeat(df.loc[df[col] == el, 'MEAN_' + d_type].values, elems.shape[0])
+
+    neighbors = {el: [neigh + '_MEAN_' + d_type for neigh in edges[np.where(edges[:, 1] == el), 0][0]] for el in elems}
+
+    return df.apply(lambda row: row[neighbors[row[col]]].sum(), axis=1).values
