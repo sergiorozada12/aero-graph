@@ -5,6 +5,8 @@ import utils as u
 
 DATA_PATH = '/home/sergio/code/aero-graph/raw_data/'
 OUT_PATH = '/home/sergio/code/aero-graph/data/'
+DATA_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\raw_data\\"
+OUT_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\data\\"
 
 N_MOST_DELAYED = 100
 
@@ -31,7 +33,7 @@ print("----------------------------------------")
 df_merged_od_pairs = u.merge_and_group(df_filt_od_pairs, problem_type=u.OD_PAIR)
 df_od_pairs = u.obtain_avg_delay(df_merged_od_pairs, shift=od_pairs.shape[0])
 df_od_pairs = u.get_time_vars(df_od_pairs, dates, hours, od_pairs, 'OD_PAIR').drop(columns=['MONTH'])
-df_final_od_pairs = u.get_label(df_od_pairs, TH, H, od_pairs)
+df_final_od_pairs = u.get_label(df_od_pairs, TH, H, od_pairs.shape[0])
 df_final_od_pairs.to_csv(OUT_PATH + 'dataset_od_pairs.csv', sep='|', index=False, index_label=False)
 u.create_od_pair_graph(od_pairs, OUT_PATH)
 print("DONE")
@@ -42,7 +44,7 @@ print("----------------------------------------")
 df_merged_node = u.merge_and_group(df_filt_airports, problem_type=u.NODE)
 df_nodes = u.obtain_avg_delay(df_merged_node, shift=nodes_airports.shape[0])
 df_nodes = u.get_time_vars(df_nodes, dates, hours, nodes_airports, 'NODE').drop(columns=['MONTH'])
-df_final_nodes = u.get_label(df_nodes, TH, H, nodes_airports)
+df_final_nodes = u.get_label(df_nodes, TH, H, nodes_airports.shape[0])
 
 df_final_nodes.drop(columns=['DEP_DELAY', 'ARR_DELAY'])\
     .to_csv(OUT_PATH + 'dataset_airports.csv', sep='|', index=False, index_label=False)
