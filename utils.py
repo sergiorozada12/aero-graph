@@ -147,17 +147,12 @@ def obtain_avg_delay(df, shift):
         df_merged_shifted[arr_col] = df_merged_shifted[arr_col].apply(fill_list_na())
         df_merged_shifted[dep_col] = df_merged_shifted[dep_col].apply(fill_list_na())
 
-        df_merged['DEP_' + general_col] = df_merged[dep_col] + df_merged_shifted[dep_col]
-        df_merged['ARR_' + general_col] = df_merged[arr_col] + df_merged_shifted[arr_col]
-
-        df_merged[general_col] = df_merged['DEP_' + general_col] + \
-                                 df_merged['ARR_' + general_col]
+        df_merged[general_col] = df_merged[arr_col] + \
+                                 df_merged[dep_col] + \
+                                 df_merged_shifted[arr_col] + \
+                                 df_merged_shifted[dep_col]
         df_merged['MEAN_' + general_col] = df_merged[general_col].apply(np.mean)
         df_merged['MEDIAN_' + general_col] = df_merged[general_col].apply(np.median)
-
-        if general_col == 'DELAY':
-            df_merged['MEAN_DEP_DELAY'] = df_merged['DEP_DELAY'].apply(np.mean)
-            df_merged['MEAN_ARR_DELAY'] = df_merged['ARR_DELAY'].apply(np.mean)
 
     df_merged['FL_DATE'] = pd.to_datetime(df_merged['FL_DATE'])
 
@@ -216,22 +211,18 @@ def get_hour(df_):
 def create_od_pair_graph(od_pairs, path):
 
     adj = np.zeros([od_pairs.shape[0], od_pairs.shape[0]])
-    edges = []
 
     for i, od_i in enumerate(od_pairs):
         for j, od_j in enumerate(od_pairs):
             if od_i.split('_')[0] == od_j.split('_')[0] or od_i.split('_')[0] == od_j.split('_')[1] or \
                     od_i.split('_')[1] == od_j.split('_')[0] or od_i.split('_')[1] == od_j.split('_')[1]:
                 adj[i, j] = 1
-                edges.append([od_i, od_j])
-
 
     degree = np.diag((adj.T@adj).diagonal())
     laplacian = degree - adj
 
     np.save(path + "graph/Adj_OD", adj)
     np.save(path + "graph/Lap_OD", laplacian)
-    np.save(path + "graph/edges_od_pairs", np.array(edges))
 
 
 def create_airport_graph(df_, nodes, path):
@@ -253,7 +244,6 @@ def create_airport_graph(df_, nodes, path):
     np.save(path + "graph/Adj_nodes", adj)
     np.save(path + "graph/Adj_w_nodes", adj_weighted)
     np.save(path + "graph/Lap_nodes", laplacian)
-    np.save(path + "graph/edges_nodes", edges.values)
 
 
 
