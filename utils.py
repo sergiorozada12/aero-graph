@@ -154,6 +154,10 @@ def obtain_avg_delay(df, shift):
         df_merged['MEAN_' + general_col] = df_merged[general_col].apply(np.mean)
         df_merged['MEDIAN_' + general_col] = df_merged[general_col].apply(np.median)
 
+        if general_col == 'DELAY':
+            df_merged['MEAN_DEP_DELAY'] = df_merged['DEP_DELAY'].apply(np.mean)
+            df_merged['MEAN_ARR_DELAY'] = df_merged['ARR_DELAY'].apply(np.mean)
+
     df_merged['FL_DATE'] = pd.to_datetime(df_merged['FL_DATE'])
 
     print("Mean delays estimated")
@@ -259,8 +263,8 @@ def get_features_df(df, df_nodes, od_pairs, nodes):
     avg_delays_od_pairs = df['MEAN_DELAY'].values.reshape(-1, od_pairs.shape[0]).astype(np.float32)
     df_od_avg_delays = pd.DataFrame(avg_delays_od_pairs, columns=od_pairs)
 
-    avg_delays_nodes_dep = df_nodes['MEAN_DELAY'].values.reshape(-1, nodes.shape[0]).astype(np.float32)
-    avg_delays_nodes_arr = df_nodes['MEAN_DELAY'].values.reshape(-1, nodes.shape[0]).astype(np.float32)
+    avg_delays_nodes_dep = df_nodes['MEAN_DEP_DELAY'].values.reshape(-1, nodes.shape[0]).astype(np.float32)
+    avg_delays_nodes_arr = df_nodes['MEAN_ARR_DELAY'].values.reshape(-1, nodes.shape[0]).astype(np.float32)
 
     cols_dep = [n + '_DEPAR' for n in nodes]
     cols_arr = [n + '_ARRIV' for n in nodes]

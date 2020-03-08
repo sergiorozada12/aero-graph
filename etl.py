@@ -5,6 +5,8 @@ import utils as u
 
 DATA_PATH = 'C:/Users/E054031/Desktop/phd/3 - research/0 - aero/paper_victor/datos/'
 OUT_PATH = 'C:/Users/E054031/Desktop/phd/3 - research/0 - aero/paper_victor/output_data/'
+DATA_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\raw_data\\"
+OUT_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\data\\"
 
 N_MOST_DELAYED = 100
 
@@ -67,7 +69,7 @@ df_nodes = u.obtain_avg_delay(df_merged_node, shift=nodes_airports.shape[0])
 df_nodes = u.get_time_vars(df_nodes, dates, hours, nodes_airports, 'NODE')
 df_final_nodes = u.get_label(df_nodes, TH, H, nodes_airports.shape[0])
 
-df_final_nodes[TIME_COLS + DELAY_COLS + ['NODE', 'y_clas']].to_csv(OUT_PATH + 'dataset_airports.csv', sep='|', index=False, index_label=False)
+df_final_nodes[TIME_COLS + DELAY_COLS + ['MEAN_DEP_DELAY', 'MEAN_ARR_DELAY'] + ['NODE', 'y_clas']].to_csv(OUT_PATH + 'dataset_airports.csv', sep='|', index=False, index_label=False)
 u.create_airport_graph(df_filt_airports, nodes_airports, OUT_PATH)
 
 print("DONE")
