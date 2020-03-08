@@ -4,6 +4,7 @@ from sklearn.linear_model import LogisticRegression
 
 import numpy as np
 import pandas as pd
+import json
 
 
 def obtain_data(df, h, cols_to_select, col_delay, n_samples):
@@ -80,6 +81,8 @@ def get_feature_importance(df, type_selector, cols_to_select, perm_cols, alt_col
 
 N_SAMPLES = 3000
 COL = 'OD_PAIR'
+OUT_PATH = 'C:/Users/E054031/Desktop/phd/3 - research/0 - aero/paper_victor/output_data/'
+FILE = 'features_rf'
 
 cols_data = list(df_data.columns) + list(df_med_node_delays.columns) + list(df_med_od_delays.columns)
 cols_data.remove('y')
@@ -110,3 +113,6 @@ for i, entity in enumerate(entities):
 
     cols, cols_imp = get_feature_importance(df_ent)
     features[entity] = {"cols": cols, "imp": cols_imp}
+
+with open('data.json', 'w') as fp:
+    json.dump(OUT_PATH + FILE, fp)
