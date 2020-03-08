@@ -76,7 +76,7 @@ def get_feature_importance(df, type_selector, cols_to_select, perm_cols, alt_col
     cols_considered_ = perm_cols + list(feats_considered_)
     cols_considered_.remove('y_clas')
 
-    return cols_considered_, feat_imp_avg[[cols_.index(c) for c in cols_considered_]]
+    return cols_considered_, feat_imp_avg[[cols_.index(c) for c in cols_considered_]].tolist()
 
 N_SAMPLES = 3000
 COL = 'NODE'
