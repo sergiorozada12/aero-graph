@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from GIGO import layers
+from gnn import layers
 
 import numpy as np
 
