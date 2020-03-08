@@ -46,8 +46,7 @@ def make_lr_test(df, alpha, cols_to_select, col_delay, h, n_samples):
                                   penalty='l1',
                                   C=1-alpha).fit(X_train, y_train)
 
-    return model_lr.coef
-
+    return np.reshape(model_lr.coef_, -1)
 
 def get_feature_importance(df, type_selector, cols_to_select, perm_cols, alt_cols, col_delay, h, n_samples):
     # 100 more relevant features
@@ -65,7 +64,7 @@ def get_feature_importance(df, type_selector, cols_to_select, perm_cols, alt_col
     # 10 more relevant features
     feat_imp_arr = np.zeros((len(cols_), 10))
     for j in range(10):
-        feat_imp = make_rf_test(df, 100, cols_, col_delay, h, n_samples) if type_selector == 1 \
+        feat_imp_arr[:,j] = make_rf_test(df, 100, cols_, col_delay, h, n_samples) if type_selector == 1 \
               else make_lr_test(df, .1, cols_, col_delay, h, n_samples)
 
     feat_imp_avg = np.mean(feat_imp_arr, axis=1)
@@ -80,15 +79,29 @@ def get_feature_importance(df, type_selector, cols_to_select, perm_cols, alt_col
     return cols_considered_, feat_imp_avg[[cols_.index(c) for c in cols_considered_]]
 
 N_SAMPLES = 3000
-COL = 'OD_PAIR'
+COL = 'NODE'
+
+LR = 0
+RF = 1
+
 OUT_PATH = 'C:/Users/E054031/Desktop/phd/3 - research/0 - aero/paper_victor/output_data/'
-FILE = 'features_rf'
+DATA_PATH = "E:/TFG_VictorTenorio/Aero_TFG/features/"
+OUT_PATH = "E:/TFG_VictorTenorio/Aero_TFG/modelIn/"
 
-cols_data = list(df_data.columns) + list(df_med_node_delays.columns) + list(df_med_od_delays.columns)
-cols_data.remove('y')
-cols_data.remove('OD_PAIR')
+DATA_FILE = 'incoming_delays_nodes.csv'
+OUT_FILE = 'features_lr.json'
 
-nodes_ods = np.array(list(od_pairs) + list(df_med_node_delays.columns))
+
+######## READ THE DATA  ########
+df = pd.read_csv(DATA_PATH + DATA_FILE, sep='|')
+df.fillna(0, inplace=True)
+
+avg_delays = pd.read_csv(DATA_PATH + 'avg_delays.csv', sep='|')
+
+cols_data = list(df.columns) + list(avg_delays.columns)
+cols_data.remove('y_clas')
+cols_data.remove('NODE')
+cols_data.remove('FL_DATE')
 
 PERM_COLS = ['HOUR',
              'DAY',
@@ -100,19 +113,23 @@ PERM_COLS = ['HOUR',
              'y_clas']
 
 ALT_COLS = []
+ALT_COLS += [col for col in df.columns if '_DELAY' in col] # Delays
+ALT_COLS.remove('MEAN_DELAY')
+ALT_COLS += list(avg_delays.columns)
 
-entities = []
+entities = np.array(sorted(df[COL].unique()))
 
 features = {}
 for i, entity in enumerate(entities):
-    print("Entity: {}".format(entity), end="")
+    print("Entity: {} - ".format(entity), end="")
 
     df_ent = df[df[COL] == entity].reset_index(drop=True)
     df_ent.drop(columns=[COL], inplace=True)
-    df_ent = pd.concat([df_ent, df_med_od_delays, df_med_node_delays], axis=1)
+    df_ent = pd.concat([df_ent, avg_delays], axis=1)
 
-    cols, cols_imp = get_feature_importance(df_ent)
+    cols, cols_imp = get_feature_importance(df_ent, LR, cols_data, PERM_COLS, ALT_COLS, 'MEAN_DELAY', 2, N_SAMPLES)
     features[entity] = {"cols": cols, "imp": cols_imp}
+    print("DONE - Cols: {}".format(cols[len(PERM_COLS):]))
 
-with open('data.json', 'w') as fp:
-    json.dump(OUT_PATH + FILE, fp)
+with open(OUT_PATH + FILE, 'w') as fp:
+    json.dump(features, fp)
