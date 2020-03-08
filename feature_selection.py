@@ -131,5 +131,5 @@ for i, entity in enumerate(entities):
     features[entity] = {"cols": cols, "imp": cols_imp}
     print("DONE - Cols: {}".format(cols[len(PERM_COLS):]))
 
-with open(OUT_PATH + FILE, 'w') as fp:
+with open(OUT_PATH + OUT_FILE, 'w') as fp:
     json.dump(features, fp)
