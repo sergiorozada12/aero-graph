@@ -1,9 +1,12 @@
-import torch.nn as nn
 import pandas as pd
 import numpy as np
 import json
 
+import torch
+import torch.nn as nn
+
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 from gnn.model import Model, ADAM
 from gnn.arch import BasicArch
@@ -15,11 +18,11 @@ GRAPH_PATH = 'E:/TFG_VictorTenorio/Aero_TFG/graph/'
 RESULTS_PATH = 'E:/TFG_VictorTenorio/Aero_TFG/results/'
 FEATURES_FILE = "features_lr.json"
 
-VERB = False
+VERB = True
 ARCH_INFO = True
 
 
-def eval_arch(X_train, y_train, X_val, y_val, X_test, y_test):
+def eval_arch(X_train, y_train, X_val, y_val, X_test, y_test, X_unbal, y_unbal):
     archit = BasicArch(**arch_params)
     model_params['arch'] = archit
 
@@ -28,43 +31,86 @@ def eval_arch(X_train, y_train, X_val, y_val, X_test, y_test):
     model = Model(**model_params)
     epochs, train_err, val_err = model.fit(X_train, y_train, X_val, y_val)
 
+    mean_train_err = np.mean(train_err)
+    mean_val_err = np.mean(val_err)
+
     print("Finished Training Model")
-    print("Epochs: {} - Train Error: {} - Validation Error: {}".format(
-        epochs, train_err, val_err
+    print("Epochs: {} - Mean Train Error: {} - Mean Validation Error: {}".format(
+        epochs, mean_train_err, mean_val_err
     ))
 
     print("Started Testing")
 
-    mean_norm_error, median_norm_error, node_mse = model.test(X_test, y_test)
+    test_loss, accuracy, precision, recall = model.test(X_test, y_test)
+    loss_unbal, acc_unbal, prec_unbal, rec_unbal = model.test(X_unbal, y_unbal)
+    dummy_accuracy = accuracy_score(y_test, torch.zeros(y_test.size()))
 
     print("----- END -------")
-    print("Mean Norm Error: {} - Median Norm Error: {} - Node MSE: {}".format(
-        mean_norm_error, median_norm_error, node_mse
+    print("Test Loss: {} - Accuracy: {} - Precision: {} - Recall: {} \
+            - Dummy Acc: {} - Accuracy Unbalanced: {}".format(
+        test_loss, accuracy, precision, recall, dummy_accuracy, acc_unbal
     ))
 
     results = {
         'epochs': epochs,
         'train_err': train_err,
         'val_err': val_err,
-        'node_mse': node_mse,
-        'mean_norm_error': mean_norm_error,
-        'median_norm_error': median_norm_error
+        'test_loss': test_loss,
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'loss_unbal': loss_unbal,
+        'acc_unbal': acc_unbal,
+        'prec_unbal': prec_unbal,
+        'rec_unbal': rec_unbal
     }
 
     return results
 
+def obtain_data(df, avg_delays, entities):
+    cols_depart = [col for col in avg_delays.columns if '_DEPAR' in col]
+    cols_arriv = [col for col in avg_delays.columns if '_ARRIV' in col]
+
+    # Data needs to be [TxFxN]
+    # T is the number of samples, in this case, the number of hours
+    # F is the number of features, now 2 (Departure and Arrival delay)
+    # N is the signal lenght
+
+    features = []
+
+    for c in PERM_COLS:
+        features.append(torch.Tensor(df[c].values.reshape(-1, entities.shape[0])))
+
+    features.append(torch.Tensor(avg_delays[cols_depart].values))
+    features.append(torch.Tensor(avg_delays[cols_arriv].values))
+
+    return torch.stack(features, dim=1)
 
 # Load the signal
 df = pd.read_csv(DATA_PATH + 'incoming_delays_nodes.csv', sep='|')
-n_feats = len(df.columns) - 2       # y and NODE
 
 avg_delays = pd.read_csv(DATA_PATH + 'avg_delays.csv', sep='|')
 
 # Load the graph
 S = np.load(GRAPH_PATH + 'Adj_nodes.npy', allow_pickle=True)
 
-# Architecture parameters
+PERM_COLS = ['HOUR',
+             'DAY',
+             'DAY_OF_WEEK',
+             'MONTH',
+             'QUARTER',
+             'SEASON']
 
+COL = 'NODE'
+N_SAMPLES = 3000
+
+entities = np.array(sorted(df[COL].unique()))
+
+# Obtain data
+X = obtain_data(df, avg_delays, entities)
+n_feats = X.size()[1]
+
+# Architecture parameters
 arch_params = {}
 arch_params['S'] = S
 arch_params['F'] = [n_feats, 32, 16, 8]
@@ -72,8 +118,6 @@ arch_params['K'] = 3
 arch_params['M'] = [32, 2]
 arch_params['nonlin'] = nn.Tanh
 arch_params['arch_info'] = ARCH_INFO
-
-model_param = {}
 
 # Model parameters
 model_params = {}
@@ -87,25 +131,25 @@ model_params['eval_freq'] = 4
 model_params['max_non_dec'] = 10
 model_params['verbose'] = VERB
 
-COL = 'NODE'
-
-with open(FEATSEL_PATH + FEATURES_FILE, 'r') as f:
-    features = json.load(f)
-
-entities = np.array(sorted(df[COL].unique()))
-
 results = {}
 for ent in entities:
-    print("Entity: {} - ".format(ent), end="")
-    df_ent = df[df[COL] == ent]
+    print("Entity: {} - ".format(ent))
+    df_ent = df[df[COL] == ent].reset_index(drop=True)
 
-    df_ent = pd.concat([df_ent, avg_delays], axis=1)
-    X = df_ent.loc[:, features[ent]["cols"]].values
+    n_delays = (df_ent['y_clas'] == 1).sum()
 
-    y = df_ent['y_clas'].values
+    idx_delay_repeated = np.repeat(df_ent[df_ent['y_clas'] == 1].index, (N_SAMPLES // n_delays) + 1)
+    idx_non_delay = np.random.choice(df_ent[df_ent['y_clas'] == 0].index, N_SAMPLES // 2, replace=False)
+    idx_delay = np.random.choice(idx_delay_repeated, N_SAMPLES // 2, replace=False)
+    idx = np.concatenate([idx_non_delay, idx_delay])
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
-    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.12, random_state=42)
+    X_bal = X[idx, :, :]
+    y = torch.LongTensor(df_ent.loc[idx, 'y_clas'].values)
 
-    results[ent] = eval_arch(X_train, y_train, X_val, y_val, X_test, y_test)
-    print("DONE - Median Error: {}".format(results[ent]['mean_norm_error']))
+    X_train, X_test, y_train, y_test = train_test_split(X_bal, y, test_size=0.1)
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.12)
+
+    y_bal = torch.LongTensor(df_ent['y_clas'].values)
+    
+    results[ent] = eval_arch(X_train, y_train, X_val, y_val, X_test, y_test, X, y_bal)
+    #print("DONE - Test Loss: {} - Accuracy: {}".format(results[ent]['test_loss'], results[ent]['accuracy']))

@@ -1,8 +1,13 @@
 from torch import optim, no_grad, nn, Tensor
+import torch
 import copy
 import time
 import numpy as np
 import sys
+
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
 
 
 # Optimizer constans
@@ -49,7 +54,7 @@ class Model:
                 # Randomly select batches
                 idx = np.random.permutation(n_samples)[:self.batch_size]
                 batch_X = train_X[idx, :, :]
-                batch_Y = train_Y[idx, :, :]
+                batch_Y = train_Y[idx]
                 self.arch.zero_grad()
 
                 # Training step
@@ -96,22 +101,19 @@ class Model:
 
     def test(self, test_X, test_Y):
         self.arch.eval()
-        # Ignoring dim[1] with only one channel
-        shape = [test_Y.shape[0], test_Y.shape[2]]
+        n_samples = test_Y.shape[0]
 
-        # Error for each node
-        Y = test_Y.view(shape)
+        # Loss
         Y_hat = self.arch(test_X)
-        Y_hat = Y_hat.view(shape)
-        node_mse = self.loss(Y_hat, Y)
+        loss = self.loss(Y_hat, test_Y)
 
-        # Normalize error for the whole signal
-        Y_hat = Y_hat.detach().numpy()
-        Y = Y.detach().numpy()
-        err = np.sum((Y_hat-Y)**2, axis=1)/np.linalg.norm(Y, axis=1)**2
-        mean_norm_error = np.mean(err)
-        median_norm_error = np.median(err)
-        return mean_norm_error, median_norm_error, node_mse.detach().numpy()
+        sm = nn.Softmax(dim=1)
+        predictions = sm(Y_hat.detach()).argmax(dim=1)
+        accuracy = torch.eq(test_Y, predictions).sum().to(dtype=torch.float) / n_samples
+        precision = precision_score(test_Y, predictions)
+        recall = recall_score(test_Y, predictions)
+
+        return loss, accuracy, precision, recall
 
 
 class LinearModel:

@@ -231,7 +231,7 @@ class BasicArch(nn.Module):
 
         # return y.squeeze(2)
 
-        y = y.reshape([T, 1, self.N*self.F[-1]])
+        y = y.reshape([T, self.N*self.F[-1]])
 
         return self.FCL(y)
 
