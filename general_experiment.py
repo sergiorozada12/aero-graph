@@ -2,6 +2,28 @@ import pandas as pd
 import json
 import numpy as np
 
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.linear_model import LogisticRegression
+
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
+
+
+def get_metrics_dict(metrics_arr):
+    return {'acc': metrics_arr[0],
+            'prec': metrics_arr[1],
+            'rec': metrics_arr[2],
+            'f1': metrics_arr[3]}
+
+
+def get_metrics(y_test, y_pred):
+    return [accuracy_score(y_test, y_pred),
+            precision_score(y_test, y_pred),
+            recall_score(y_test, y_pred),
+            f1_score(y_test, y_pred)]
+
 
 def obtain_training_data(df_train, df_test, h, col_delay, n_samples):
     df_ = df_train.loc[df_train[col_delay].shift(-h).fillna(0) != 0]
@@ -17,12 +39,14 @@ def obtain_training_data(df_train, df_test, h, col_delay, n_samples):
     X_train = df_.loc[idx, df_train.columns[:-1]].values
     y_train = df_.loc[idx, df_train.columns[-1]].values
 
-    X_test = df_test.loc[idx, df_test.columns[:-1]].values
-    y_test = df_test.loc[idx, df_test.columns[-1]].values
+    X_test = df_test.values[:, :-1]
+    y_test = df_test.values[:, -1]
 
     scaler = MinMaxScaler()
-    scaler.fit_transform(X_train)
-    scaler.fit_transform(X_test)
+    scaler.fit(X_train)
+
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
 
     return X_train, y_train, X_test, y_test
 
@@ -32,6 +56,7 @@ DATA_PATH = "data/"
 DATA_FILE_1 = 'incoming_delays_nodes.csv'
 DATA_FILE_2 = 'avg_delays.csv'
 FEATURES_JSON = 'features_node_all_lr.json'
+RESULTS_JSON = 'results_lr.json'
 
 COL = 'NODE'
 N_SAMPLES = 3000
@@ -47,6 +72,7 @@ with open(DATA_PATH + FEATURES_JSON, 'r') as f:
 
 entities = np.array(sorted(df_1[COL].unique()))
 
+results = {}
 for i, entity in enumerate(entities):
     print("Entity: {} - ".format(entity), end="")
 
@@ -56,7 +82,23 @@ for i, entity in enumerate(entities):
     df_train = df[df['YEAR'] == 2018][features[entity]['cols'] + ['y_clas']].reset_index(drop=True)
     df_test = df[df['YEAR'] == 2019][features[entity]['cols'] + ['y_clas']].reset_index(drop=True)
 
+    metrics = []
     for j in range(ITERS):
         X_train, y_train, X_test, y_test = obtain_training_data(df_train, df_test, H, COL_DELAY, N_SAMPLES)
 
+        model = LogisticRegression(random_state=0,
+                                   solver='liblinear',
+                                   penalty='l1',
+                                   C=.9).fit(X_train, y_train)
+
+        y_pred = model.predict(X_test)
+        metrics.append(get_metrics(y_test, y_pred))
+
+    metrics_ent = get_metrics_dict(np.mean(metrics, axis=0))
+
+    results[entity] = metrics
+    print("DONE - Results: {}\n".format(metrics_ent))
+
+with open(DATA_PATH + RESULTS_JSON, 'w') as fp:
+    json.dump(results, fp)
 

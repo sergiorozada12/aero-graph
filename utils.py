@@ -325,7 +325,7 @@ def obtain_data(df, h, cols_to_select, col_delay, n_samples):
     y = df_.loc[idx, 'y_clas'].values
 
     scaler = MinMaxScaler()
-    scaler.fit_transform(X)
+    X = scaler.fit_transform(X)
 
     return X, y
 
