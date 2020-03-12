@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import json
+import utils as u
 
 
 N_SAMPLES = 3000
@@ -17,8 +18,7 @@ OUT_FILE = 'features_lr.json'
 
 
 ######## READ THE DATA  ########
-df = pd.read_csv(DATA_PATH + DATA_FILE, sep='|')
-df.fillna(0, inplace=True)
+df = pd.read_csv(DATA_PATH + DATA_FILE, sep='|').fillna(0)
 
 avg_delays = pd.read_csv(DATA_PATH + 'avg_delays.csv', sep='|')
 
@@ -51,7 +51,7 @@ for i, entity in enumerate(entities):
     df_ent.drop(columns=[COL], inplace=True)
     df_ent = pd.concat([df_ent, avg_delays], axis=1)
 
-    cols, cols_imp = get_feature_importance(df_ent, SELECTOR_RF, cols_data, PERM_COLS, ALT_COLS, 'MEAN_DELAY', 2, N_SAMPLES)
+    cols, cols_imp = u.get_feature_importance(df_ent, SELECTOR_RF, cols_data, PERM_COLS, ALT_COLS, 'MEAN_DELAY', 2, N_SAMPLES)
     features[entity] = {"cols": cols, "imp": cols_imp}
     print("DONE - Cols: {}".format(cols[len(PERM_COLS):]))
 
