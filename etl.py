@@ -24,6 +24,8 @@ TIME_COLS = ['FL_DATE',
 
 DELAY_COLS = ['MEDIAN_DELAY',
               'MEAN_DELAY',
+              'MEAN_DEP_DELAY',
+              'MEAN_ARR_DELAY',
               'MEDIAN_CARRIER_DELAY',
               'MEAN_CARRIER_DELAY',
               'MEDIAN_LATE_AIRCRAFT_DELAY',
@@ -69,7 +71,7 @@ df_nodes = u.obtain_avg_delay(df_merged_node, shift=nodes_airports.shape[0])
 df_nodes = u.get_time_vars(df_nodes, dates, hours, nodes_airports, 'NODE')
 df_final_nodes = u.get_label(df_nodes, TH, H, nodes_airports.shape[0])
 
-df_final_nodes[TIME_COLS + DELAY_COLS + ['MEAN_DEP_DELAY', 'MEAN_ARR_DELAY'] + ['NODE', 'y_clas']].to_csv(OUT_PATH + 'dataset_airports.csv', sep='|', index=False, index_label=False)
+df_final_nodes[TIME_COLS + DELAY_COLS + ['NODE', 'y_clas']].to_csv(OUT_PATH + 'dataset_airports.csv', sep='|', index=False, index_label=False)
 u.create_airport_graph(df_filt_airports, nodes_airports, OUT_PATH)
 
 print("DONE")

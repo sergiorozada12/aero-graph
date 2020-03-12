@@ -150,10 +150,11 @@ def obtain_avg_delay(df, shift):
         df_merged_shifted[arr_col] = df_merged_shifted[arr_col].apply(fill_list_na())
         df_merged_shifted[dep_col] = df_merged_shifted[dep_col].apply(fill_list_na())
 
-        df_merged[general_col] = df_merged[arr_col] + \
-                                 df_merged[dep_col] + \
-                                 df_merged_shifted[arr_col] + \
-                                 df_merged_shifted[dep_col]
+        df_merged['DEP_' + general_col] = df_merged[dep_col] + df_merged_shifted[dep_col]
+        df_merged['ARR_' + general_col] = df_merged[arr_col] + df_merged_shifted[arr_col]
+
+        df_merged[general_col] = df_merged['DEP_' + general_col] + df_merged['ARR_' + general_col]
+
         df_merged['MEAN_' + general_col] = df_merged[general_col].apply(np.mean)
         df_merged['MEDIAN_' + general_col] = df_merged[general_col].apply(np.median)
 
