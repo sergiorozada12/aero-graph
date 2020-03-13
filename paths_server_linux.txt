@@ -1,0 +1,21 @@
+etl
+
+DATA_PATH = '/home/server/Aero/aero-graph/raw_data/'
+OUT_PATH = '/home/server/Aero/data/'
+
+feature engineering
+
+DATA_PATH = '/home/server/Aero/data/'
+OUT_PATH = '/home/server/Aero/features/'
+
+feature selection
+
+DATA_PATH = '/home/server/Aero/features/'
+OUT_PATH = '/home/server/Aero/modelIn/'
+
+Model GNN
+
+DATA_PATH = '/home/server/Aero/features/'
+FEATSEL_PATH = '/home/server/Aero/modelIn/'
+GRAPH_PATH = '/home/server/Aero/data/graph/'
+RESULTS_PATH = '/home/server/Aero/results/'

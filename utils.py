@@ -268,21 +268,46 @@ def create_airport_graph(df_, nodes, path):
 ########    UTILS FOR FEATURE ENGINEERING   ############
 ########################################################
 
-def get_features_df(df, df_nodes, od_pairs, nodes):
-    avg_delays_od_pairs = df['MEAN_DELAY'].values.reshape(-1, od_pairs.shape[0]).astype(np.float32)
-    df_od_avg_delays = pd.DataFrame(avg_delays_od_pairs, columns=od_pairs)
+def get_features_df(df_ods, df_nodes, od_pairs, nodes):
+    avg_delays_od_dep = df_ods['MEAN_DEP_DELAY'].values.reshape(-1, od_pairs.shape[0]).astype(np.float32)
+    avg_delays_od_arr = df_ods['MEAN_ARR_DELAY'].values.reshape(-1, od_pairs.shape[0]).astype(np.float32)
+
+    cols_dep_od = [od + '_DEP' for od in od_pairs]
+    cols_arr_od = [od + '_ARR' for od in od_pairs]
+
+    df_od_avg_delays = pd.concat([pd.DataFrame(avg_delays_od_dep, columns=cols_dep_od),
+                                  pd.DataFrame(avg_delays_od_arr, columns=cols_arr_od)], axis=1)
 
     avg_delays_nodes_dep = df_nodes['MEAN_DEP_DELAY'].values.reshape(-1, nodes.shape[0]).astype(np.float32)
     avg_delays_nodes_arr = df_nodes['MEAN_ARR_DELAY'].values.reshape(-1, nodes.shape[0]).astype(np.float32)
 
-    cols_dep = [n + '_DEPAR' for n in nodes]
-    cols_arr = [n + '_ARRIV' for n in nodes]
+    cols_dep_node = [n + '_DEP' for n in nodes]
+    cols_arr_node = [n + '_ARR' for n in nodes]
 
-    df_node_avg_delays = pd.concat([pd.DataFrame(avg_delays_nodes_dep, columns=cols_dep),
-                                    pd.DataFrame(avg_delays_nodes_arr, columns=cols_arr)], axis=1)
+    df_node_avg_delays = pd.concat([pd.DataFrame(avg_delays_nodes_dep, columns=cols_dep_node),
+                                    pd.DataFrame(avg_delays_nodes_arr, columns=cols_arr_node)], axis=1)
 
     return pd.concat([df_od_avg_delays, df_node_avg_delays], axis=1)
 
+def get_delay_types_df(df_ods, df_nodes, d_types, od_pairs, nodes):
+    dfs = []
+    for d in d_types:
+        cols_od = [od + d for od in od_pairs]
+
+        d_type_df_od = pd.DataFrame(df_ods['MEAN_' + d].values.\
+                        reshape(-1, od_pairs.shape[0]).astype(np.float32),
+                        columns=cols_od)
+
+        cols_nodes = [n + d for n in nodes]
+
+        d_type_df_node = pd.DataFrame(df_nodes['MEAN_' + d].values.\
+                            reshape(-1, od_pairs.shape[0]).astype(np.float32),
+                            columns=cols_nodes)
+
+        dfs.append(d_type_df_od)
+        dfs.append(d_type_df_node)
+
+    return pd.concat(dfs, axis=1)
 
 def apply_clustering(df_, n_clust, n_dates, n_hours, random_state=None):
     df = df_.copy()
