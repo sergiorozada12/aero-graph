@@ -3,10 +3,10 @@ import numpy as np
 
 import utils as u
 
-DATA_PATH = 'C:/Users/E054031/Desktop/phd/3 - research/0 - aero/paper_victor/datos/'
-OUT_PATH = 'C:/Users/E054031/Desktop/phd/3 - research/0 - aero/paper_victor/output_data/'
-DATA_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\raw_data\\"
-OUT_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\data\\"
+DATA_PATH = '/home/server/Aero/aero-graph/raw_data/'
+OUT_PATH = '/home/server/Aero/data/'
+# DATA_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\raw_data\\"
+# OUT_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\data\\"
 
 N_MOST_DELAYED = 100
 

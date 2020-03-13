@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import numpy as np
 import zipfile
+import json
 
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler
@@ -13,9 +14,13 @@ from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import f1_score
 
+# Columns options
 OD_PAIR = 0
 NODE = 1
 
+# Feature selection options
+LR = 0
+RF = 1
 
 def load_df_from_raw_files(path):
     df = pd.DataFrame()
@@ -328,6 +333,8 @@ def treat_delay_type(d_type, df_, elems, col, edges):
     df = df_.copy()
     for el in elems:
         df[el + '_MEAN_' + d_type] = np.repeat(df.loc[df[col] == el, 'MEAN_' + d_type].values, elems.shape[0])
+    
+    print("Start calculating neighbours")
 
     neighbors = {el: [neigh + '_MEAN_' + d_type for neigh in edges[np.where(edges[:, 1] == el), 0][0]] for el in elems}
 
@@ -378,11 +385,14 @@ def make_lr_test(df, alpha, cols_to_select, col_delay, h, n_samples):
                                   penalty='l1',
                                   C=1-alpha).fit(X_train, y_train)
 
-    return np.reshape(model_lr.coef_, -1)
+    return np.reshape(np.absolute(model_lr.coef_), -1)
 
-def get_feature_importance(df, type_selector, cols_to_select, perm_cols, alt_cols, col_delay, h, n_samples):
+def get_feature_importance(df, type_selector, perm_cols, alt_cols, col_delay, h, n_samples):
+    cols_to_select = perm_cols + alt_cols
+    cols_to_select.remove('y_clas')
+    
     # 100 more relevant features
-    feat_imp = make_rf_test(df, 15, cols_to_select, col_delay, h, n_samples) if type_selector == 1 \
+    feat_imp = make_rf_test(df, 15, cols_to_select, col_delay, h, n_samples) if type_selector == RF \
           else make_lr_test(df, .1, cols_to_select, col_delay, h, n_samples)
     del_idx = [cols_to_select.index(c) for c in alt_cols]
     relevant_feat_idx = np.argsort(feat_imp[del_idx])[::-1][0:100]
@@ -396,7 +406,7 @@ def get_feature_importance(df, type_selector, cols_to_select, perm_cols, alt_col
     # 10 more relevant features
     feat_imp_arr = np.zeros((len(cols_), 10))
     for j in range(10):
-        feat_imp_arr[:, j] = make_rf_test(df, 100, cols_, col_delay, h, n_samples) if type_selector == 1 \
+        feat_imp_arr[:,j] = make_rf_test(df, 100, cols_, col_delay, h, n_samples) if type_selector == RF \
               else make_lr_test(df, .1, cols_, col_delay, h, n_samples)
 
     feat_imp_avg = np.mean(feat_imp_arr, axis=1)
@@ -410,6 +420,32 @@ def get_feature_importance(df, type_selector, cols_to_select, perm_cols, alt_col
 
     return cols_considered_, feat_imp_avg[[cols_.index(c) for c in cols_considered_]].tolist()
 
+def feature_selection(df, entities, avg_delays, perm_cols, alt_cols, n_samples, col, out_path):
+
+    features_lr = {}
+    features_rf = {}
+    for entity in entities:
+        print("Entity: {} - ".format(entity), end="")
+
+        df_ent = df[df[col] == entity].reset_index(drop=True)
+        df_ent.drop(columns=[col], inplace=True)
+        df_ent = pd.concat([df_ent, avg_delays], axis=1)
+
+        # LOGISTIC REGRESSION
+        cols, cols_imp = get_feature_importance(df_ent, LR, perm_cols, alt_cols, 'MEAN_DELAY', 2, n_samples)
+        features_lr[entity] = {"cols": cols, "imp": cols_imp}
+
+        # RANDOM FOREST
+        cols, cols_imp = get_feature_importance(df_ent, RF, perm_cols, alt_cols, 'MEAN_DELAY', 2, n_samples)
+        features_rf[entity] = {"cols": cols, "imp": cols_imp}
+
+        print("DONE - Cols: {}".format(cols[len(perm_cols):]))
+
+    with open(out_path + 'feat_lr_{}.json'.format(col.lower() + 's'), 'w') as fp:
+        json.dump(features_lr, fp)
+
+    with open(out_path + 'feat_rf_{}.json'.format(col.lower() + 's'), 'w') as fp:
+        json.dump(features_rf, fp)
 
 ########################################################
 ########    UTILS FOR GENERAL EXPERIMENTS   ############
