@@ -301,7 +301,7 @@ def get_delay_types_df(df_ods, df_nodes, d_types, od_pairs, nodes):
         cols_nodes = [n + d for n in nodes]
 
         d_type_df_node = pd.DataFrame(df_nodes['MEAN_' + d].values.\
-                            reshape(-1, od_pairs.shape[0]).astype(np.float32),
+                            reshape(-1, nodes.shape[0]).astype(np.float32),
                             columns=cols_nodes)
 
         dfs.append(d_type_df_od)

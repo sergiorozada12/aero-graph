@@ -74,7 +74,7 @@ for d in DELAY_TYPES:
     print("Working on " + d)
     col = 'INCOMING_MEAN_' + d
     # OD Pairs
-    # df_casted[col] = u.treat_delay_type(d, df_casted[['OD_PAIR', 'MEAN_' + d]], od_pairs, 'OD_PAIR', edges_od_pairs)
+    df_casted[col] = u.treat_delay_type(d, df_casted[['OD_PAIR', 'MEAN_' + d]], od_pairs, 'OD_PAIR', edges_od_pairs)
 
     # Nodes
     df_nodes[col] = u.treat_delay_type(d, df_nodes[['NODE', 'MEAN_' + d]], nodes, 'NODE', edges_nodes)
