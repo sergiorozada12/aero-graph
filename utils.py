@@ -8,6 +8,11 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
+
 OD_PAIR = 0
 NODE = 1
 
@@ -309,7 +314,6 @@ def treat_delay_type(d_type, df_, elems, col, edges):
 ########################################################
 
 
-
 def obtain_data(df, h, cols_to_select, col_delay, n_samples):
     df_ = df.loc[df[col_delay].shift(-h).fillna(0) != 0]
 
@@ -380,3 +384,48 @@ def get_feature_importance(df, type_selector, cols_to_select, perm_cols, alt_col
     cols_considered_.remove('y_clas')
 
     return cols_considered_, feat_imp_avg[[cols_.index(c) for c in cols_considered_]].tolist()
+
+
+########################################################
+########    UTILS FOR GENERAL EXPERIMENTS   ############
+########################################################
+
+
+def get_metrics_dict(metrics_arr):
+    return {'acc': metrics_arr[0],
+            'prec': metrics_arr[1],
+            'rec': metrics_arr[2],
+            'f1': metrics_arr[3]}
+
+
+def get_metrics(y_test, y_pred):
+    return [accuracy_score(y_test, y_pred),
+            precision_score(y_test, y_pred),
+            recall_score(y_test, y_pred),
+            f1_score(y_test, y_pred)]
+
+
+def obtain_training_data(df_train, df_test, h, col_delay, n_samples):
+    df_ = df_train.loc[df_train[col_delay].shift(-h).fillna(0) != 0]
+
+    df_delay = df_[df_['y_clas'] == 1]
+
+    idx_delay_repeated = np.repeat(df_delay.index, (n_samples // len(df_delay)) + 1)
+
+    idx_non_delay = np.random.choice(df_[df_['y_clas'] == 0].index, n_samples // 2, replace=False)
+    idx_delay = np.random.choice(idx_delay_repeated, n_samples // 2, replace=False)
+    idx = np.concatenate([idx_non_delay, idx_delay])
+
+    X_train = df_.loc[idx, df_train.columns[:-1]].values
+    y_train = df_.loc[idx, df_train.columns[-1]].values
+
+    X_test = df_test.values[:, :-1]
+    y_test = df_test.values[:, -1]
+
+    scaler = MinMaxScaler()
+    scaler.fit(X_train)
+
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
+
+    return X_train, y_train, X_test, y_test
