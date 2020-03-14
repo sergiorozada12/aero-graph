@@ -2,8 +2,11 @@ import numpy as np
 import pandas as pd
 import utils as u
 
-DATA_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\data\\"
-OUT_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\features\\"
+
+DATA_PATH = '/home/server/Aero/data/'
+OUT_PATH = '/home/server/Aero/features/'
+# DATA_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\data\\"
+# OUT_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\features\\"
 
 DELAY_TYPES = ['DELAY', 'CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
 
@@ -74,14 +77,16 @@ for d in DELAY_TYPES:
     print("Working on " + d)
     col = 'INCOMING_MEAN_' + d
     # OD Pairs
-    # df_casted[col] = u.treat_delay_type(d, df_casted[['OD_PAIR', 'MEAN_' + d]], od_pairs, 'OD_PAIR', edges_od_pairs)
+    print("OD Pairs")
+    df_casted[col] = u.treat_delay_type(d, df_casted[['OD_PAIR', 'MEAN_' + d]], od_pairs, 'OD_PAIR', edges_od_pairs)
 
     # Nodes
+    print("Nodes")
     df_nodes[col] = u.treat_delay_type(d, df_nodes[['NODE', 'MEAN_' + d]], nodes, 'NODE', edges_nodes)
 
     colums_incoming_delay.append(col)
 
-print("DONE")
+    print("DONE")
 
 ######  SAVING THE DATA   ######
 
