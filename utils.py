@@ -395,7 +395,7 @@ def get_feature_importance(df, type_selector, perm_cols, alt_cols, col_delay, h,
     feat_imp = make_rf_test(df, 15, cols_to_select, col_delay, h, n_samples) if type_selector == RF \
           else make_lr_test(df, .1, cols_to_select, col_delay, h, n_samples)
     del_idx = [cols_to_select.index(c) for c in alt_cols]
-    relevant_feat_idx = np.argsort(feat_imp[del_idx])[0:100]
+    relevant_feat_idx = np.argsort(feat_imp[del_idx])[::-1][0:100]
 
     feats_considered = np.array(alt_cols)[relevant_feat_idx]
     cols_ = perm_cols + list(feats_considered)
@@ -412,7 +412,7 @@ def get_feature_importance(df, type_selector, perm_cols, alt_cols, col_delay, h,
     feat_imp_avg = np.mean(feat_imp_arr, axis=1)
 
     del_idx_ = [cols_.index(n) for n in feats_considered]
-    relevant_feat_idx_ = np.argsort(feat_imp_avg[del_idx_])[0:10]
+    relevant_feat_idx_ = np.argsort(feat_imp_avg[del_idx_])[::-1][0:10]
 
     feats_considered_ = np.array(feats_considered)[relevant_feat_idx_]
     cols_considered_ = perm_cols + list(feats_considered_)
