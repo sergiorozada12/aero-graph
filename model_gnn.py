@@ -83,24 +83,24 @@ def obtain_data(df_d_types, avg_delays, entities):
     # for c in PERM_COLS:
     #     features.append(torch.Tensor(df[c].values.reshape(-1, entities.shape[0])))
 
-    features.append(torch.Tensor(avg_delays[cols_depart].values))
-    features.append(torch.Tensor(avg_delays[cols_arriv].values))
+    features.append(avg_delays[cols_depart].values)
+    features.append(avg_delays[cols_arriv].values)
 
     # Delay -1 hour
-    features.append(torch.Tensor(avg_delays.shift(1)[cols_arriv].fillna(0).values))
+    features.append(avg_delays.shift(1)[cols_arriv].fillna(0).values)
 
     # Delay -2 hour
-    features.append(torch.Tensor(avg_delays.shift(2)[cols_arriv].fillna(0).values))
+    features.append(avg_delays.shift(2)[cols_arriv].fillna(0).values)
 
     # Delay -1 day
-    features.append(torch.Tensor(avg_delays.shift(24)[cols_arriv].fillna(0).values))
+    features.append(avg_delays.shift(24)[cols_arriv].fillna(0).values)
 
     # Delay types
     for d in DELAY_TYPES:
         cols_d = [ent + d for ent in entities]
-        features.append(torch.Tensor(df_d_types[cols_d].values))
+        features.append(df_d_types[cols_d].values)
 
-    return torch.stack(features, dim=1)
+    return np.stack(features, axis=1)
 
 # Load the signal
 df = pd.read_csv(DATA_PATH + 'incoming_delays_nodes.csv', sep='|')
@@ -120,7 +120,7 @@ PERM_COLS = ['HOUR',
              'SEASON']
 
 COL = 'NODE'
-N_SAMPLES = 3000
+N_SAMPLES = 5000
 
 entities = np.array(sorted(df[COL].unique()))
 
@@ -161,13 +161,20 @@ for ent in entities:
     idx_delay = np.random.choice(idx_delay_repeated, N_SAMPLES // 2, replace=False)
     idx = np.concatenate([idx_non_delay, idx_delay])
 
-    X_bal = X[idx, :, :]
-    y = torch.LongTensor(df_ent.loc[idx, 'y_clas'].values)
+    X_unbal = X[idx, :, :]
+    y = df_ent.loc[idx, 'y_clas'].values
 
-    X_train, X_test, y_train, y_test = train_test_split(X_bal, y, test_size=0.1)
+    X_train, X_test, y_train, y_test = train_test_split(X_unbal, y, test_size=0.1)
     X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.12)
 
-    y_bal = torch.LongTensor(df_ent['y_clas'].values)
+    y_bal = df_ent['y_clas'].values
     
-    results[ent] = eval_arch(X_train, y_train, X_val, y_val, X_test, y_test, X, y_bal)
+    results[ent] = eval_arch(torch.Tensor(X_train),
+                             torch.LongTensor(y_train),
+                             torch.Tensor(X_val),
+                             torch.LongTensor(y_val),
+                             torch.Tensor(X_test),
+                             torch.LongTensor(y_test),
+                             torch.Tensor(X),
+                             torch.LongTensor(y_bal))
     #print("DONE - Test Loss: {} - Accuracy: {}".format(results[ent]['test_loss'], results[ent]['accuracy']))
