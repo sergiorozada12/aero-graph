@@ -297,13 +297,13 @@ def get_features_df(df_ods, df_nodes, od_pairs, nodes):
 def get_delay_types_df(df_ods, df_nodes, d_types, od_pairs, nodes):
     dfs = []
     for d in d_types:
-        cols_od = [od + d for od in od_pairs]
+        cols_od = [od + '_' + d for od in od_pairs]
 
         d_type_df_od = pd.DataFrame(df_ods['MEAN_' + d].values.\
                         reshape(-1, od_pairs.shape[0]).astype(np.float32),
                         columns=cols_od)
 
-        cols_nodes = [n + d for n in nodes]
+        cols_nodes = [n + '_' + d for n in nodes]
 
         d_type_df_node = pd.DataFrame(df_nodes['MEAN_' + d].values.\
                             reshape(-1, nodes.shape[0]).astype(np.float32),
