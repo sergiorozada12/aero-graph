@@ -12,11 +12,10 @@ from gnn.model import Model, ADAM
 from gnn.arch import BasicArch
 
 
-DATA_PATH = 'E:/TFG_VictorTenorio/Aero_TFG/features/'
-FEATSEL_PATH = 'E:/TFG_VictorTenorio/Aero_TFG/modelIn/'
-GRAPH_PATH = 'E:/TFG_VictorTenorio/Aero_TFG/graph/'
-RESULTS_PATH = 'E:/TFG_VictorTenorio/Aero_TFG/results/'
-FEATURES_FILE = "features_lr.json"
+DATA_PATH = '/home/server/Aero/features/'
+FEATSEL_PATH = '/home/server/Aero/modelIn/'
+GRAPH_PATH = '/home/server/Aero/data/graph/'
+RESULTS_PATH = '/home/server/Aero/results/'
 
 VERB = True
 ARCH_INFO = True
