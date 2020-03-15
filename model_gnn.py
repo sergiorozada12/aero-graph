@@ -21,6 +21,8 @@ FEATURES_FILE = "features_lr.json"
 VERB = True
 ARCH_INFO = True
 
+DELAY_TYPES = ['CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
+
 
 def eval_arch(X_train, y_train, X_val, y_val, X_test, y_test, X_unbal, y_unbal):
     archit = BasicArch(**arch_params)
@@ -67,27 +69,43 @@ def eval_arch(X_train, y_train, X_val, y_val, X_test, y_test, X_unbal, y_unbal):
 
     return results
 
-def obtain_data(df, avg_delays, entities):
-    cols_depart = [col for col in avg_delays.columns if '_DEPAR' in col]
-    cols_arriv = [col for col in avg_delays.columns if '_ARRIV' in col]
+def obtain_data(df_d_types, avg_delays, entities):
+    cols_depart = [ent + '_DEP' for ent in entities]
+    cols_arriv = [ent + '_ARR' for ent in entities]
 
     # Data needs to be [TxFxN]
     # T is the number of samples, in this case, the number of hours
-    # F is the number of features, now 2 (Departure and Arrival delay)
+    # F is the number of features
     # N is the signal lenght
 
     features = []
 
-    for c in PERM_COLS:
-        features.append(torch.Tensor(df[c].values.reshape(-1, entities.shape[0])))
+    # for c in PERM_COLS:
+    #     features.append(torch.Tensor(df[c].values.reshape(-1, entities.shape[0])))
 
     features.append(torch.Tensor(avg_delays[cols_depart].values))
     features.append(torch.Tensor(avg_delays[cols_arriv].values))
+
+    # Delay -1 hour
+    features.append(torch.Tensor(avg_delays.shift(1)[cols_arriv].fillna(0).values))
+
+    # Delay -2 hour
+    features.append(torch.Tensor(avg_delays.shift(2)[cols_arriv].fillna(0).values))
+
+    # Delay -1 day
+    features.append(torch.Tensor(avg_delays.shift(24)[cols_arriv].fillna(0).values))
+
+    # Delay types
+    for d in DELAY_TYPES:
+        cols_d = [ent + d for ent in entities]
+        features.append(torch.Tensor(df_d_types[cols_d].values))
 
     return torch.stack(features, dim=1)
 
 # Load the signal
 df = pd.read_csv(DATA_PATH + 'incoming_delays_nodes.csv', sep='|')
+
+df_d_types = pd.read_csv(DATA_PATH + 'df_d_types.csv', sep='|')
 
 avg_delays = pd.read_csv(DATA_PATH + 'avg_delays.csv', sep='|')
 
@@ -107,7 +125,7 @@ N_SAMPLES = 3000
 entities = np.array(sorted(df[COL].unique()))
 
 # Obtain data
-X = obtain_data(df, avg_delays, entities)
+X = obtain_data(df_d_types, avg_delays, entities)
 n_feats = X.size()[1]
 
 # Architecture parameters
