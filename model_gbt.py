@@ -50,7 +50,7 @@ for i, entity in enumerate(entities):
 
     metrics_ent = get_metrics_dict(np.mean(metrics, axis=0))
 
-    results[entity] = metrics
+    results[entity] = metrics_ent
     print("DONE - Results: {}\n".format(metrics_ent))
 
 with open(DATA_PATH + RESULTS_JSON, 'w') as fp:
