@@ -5,6 +5,7 @@ import numpy as np
 import utils as u
 
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
 
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation
@@ -22,8 +23,7 @@ def undersample(df, ratio_imbalance, col_target):
 
 DATA_PATH = "data/"
 
-DATA_FILE_1 = 'incoming_delays_nodes.csv'
-DATA_FILE_2 = 'avg_delays.csv'
+DATA_FILE = 'incoming_delays_nodes.csv'
 RESULTS_JSON = 'results_model_sergio.json'
 
 COL = 'NODE'
@@ -46,11 +46,13 @@ COLS_TRAIN = ['HOUR',
 
 COL_TARGET = COLS_TRAIN[-1]
 
-df = pd.read_csv(DATA_PATH + DATA_FILE_1, sep='|').fillna(0)
+df = pd.read_csv(DATA_PATH + DATA_FILE, sep='|').fillna(0)
 
 entities = np.array(sorted(df[COL].unique()))
 
 results = {}
+y_test_acc = np.array([])
+y_pred_acc = np.array([])
 for i, entity in enumerate(entities):
     print("Entity: {} - ".format(entity), end="")
 
@@ -61,10 +63,10 @@ for i, entity in enumerate(entities):
 
     df_train_undersampled = undersample(df_train, RATIO_IMB, COL_TARGET)
 
-    X_train = df_train_undersampled[COLS_TRAIN:-1]
-    X_test = df_test[COLS_TRAIN:-1]
-    y_train = df_train_undersampled[-1]
-    y_test = df_test[-1]
+    X_train = df_train_undersampled[COLS_TRAIN[:-1]].values
+    X_test = df_test[COLS_TRAIN[:-1]].values
+    y_train = df_train_undersampled[COL_TARGET].values
+    y_test = df_test[COL_TARGET].values
 
     scaler = MinMaxScaler()
     scaler.fit(X_train)
@@ -82,7 +84,7 @@ for i, entity in enumerate(entities):
     model.add(Dropout(0.5))
     model.add(Dense(1000, activation='relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(y_train.shape[1], activation='sigmoid'))
+    model.add(Dense(1, activation='sigmoid'))
 
     model.compile(loss='binary_crossentropy',
                   optimizer='adam',
@@ -106,6 +108,14 @@ for i, entity in enumerate(entities):
 
     results[entity] = metrics_ent
     print("DONE - Results: {}\n".format(metrics_ent))
+
+    y_test_acc = np.concatenate([y_test_acc, y_test])
+    y_pred_acc = np.concatenate([y_pred_acc, y_pred.flatten()])
+
+    metrics_acc = u.get_metrics_dict(u.get_metrics(y_test_acc, y_pred_acc))
+    print("Accumulated results: {}\n".format(metrics_acc))
+
+results['TOTAL'] = metrics_acc
 
 with open(DATA_PATH + RESULTS_JSON, 'w') as fp:
     json.dump(results, fp)
