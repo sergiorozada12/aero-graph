@@ -12,8 +12,9 @@ DATA_PATH = "data/"
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
 DATA_FILE_OD_PAIRS = 'incoming_delays_ods.csv'
 DATA_FILE_DELAYS = 'avg_delays.csv'
-FEATURES_JSON_LR = 'features_node_all_lr.json'
-FEATURES_JSON_RF = 'features_node_all_lr.json'
+DATA_PATH = '/home/server/Aero/features/'
+FEATSEL_PATH = '/home/server/Aero/modelIn/'
+RESULTS_PATH = '/home/server/Aero/results/'
 
 COLS = ['NODE', 'OD_PAIR']
 FEATS = ['LR', 'RF']
@@ -26,16 +27,12 @@ df_nodes = pd.read_csv(DATA_PATH + DATA_FILE_NODES, sep='|').fillna(0)
 df_odpairs = pd.read_csv(DATA_PATH + DATA_FILE_OD_PAIRS, sep='|').fillna(0)
 df_2 = pd.read_csv(DATA_PATH + DATA_FILE_DELAYS, sep='|')
 
-with open(DATA_PATH + FEATURES_JSON_LR, 'r') as f:
-    features_lr = json.load(f)
-
-with open(DATA_PATH + FEATURES_JSON_RF, 'r') as f:
-    features_rf = json.load(f)
-
 for feat in FEATS:
-    features = features_rf if feat == 'RF' else features_lr
 
     for col in COLS:
+
+        with open(FEATSEL_PATH + 'feat_{}_{}s.json'.format(feat.lower(), col.lower()), 'r') as f:
+            features = json.load(f)
 
         if col == 'NODE':
             df_1 = df_nodes
@@ -83,6 +80,6 @@ for feat in FEATS:
             results[entity]['bal_zeros'] = u.get_metrics_dict(np.mean(metrics_0s, axis=0))
             print("DONE - Results: {}".format(metrics_ent))
 
-        with open(DATA_PATH + 'results_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
+        with open(RESULTS_PATH + 'results_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
             json.dump(results, fp)
 
