@@ -66,12 +66,17 @@ for feat in FEATS:
                                                                   random_state=42,
                                                                   shuffle=True)
 
+                try:
+                    features_out = y_train.shape[1]
+                except IndexError:
+                    features_out = 1
+
                 model = Sequential()
                 model.add(Dense(1000, activation='relu', input_dim=X_train.shape[1]))
                 model.add(Dropout(0.5))
                 model.add(Dense(1000, activation='relu'))
                 model.add(Dropout(0.5))
-                model.add(Dense(y_train.shape[1], activation='sigmoid'))
+                model.add(Dense(features_out, activation='sigmoid'))
 
                 model.compile(loss='binary_crossentropy',
                               optimizer='adam',
@@ -108,7 +113,7 @@ for feat in FEATS:
             }
             print("DONE - Results: {}\n".format(metrics_ent))
 
-        with open(RESULTS_PATH + 'results_' + feat.lower() + '_' + col.lower(), 'w') as fp:
+        with open(RESULTS_PATH + 'results_MLP_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
             json.dump(results, fp)
 
 

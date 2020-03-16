@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 
+import utils as u
 
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
 DATA_FILE_OD_PAIRS = 'incoming_delays_ods.csv'
@@ -59,7 +60,7 @@ for feat in FEATS:
                 model = GradientBoostingClassifier(n_estimators=100,
                                                    max_depth=5,
                                                    random_state=0,
-                                                   criterion='gini').fit(X_train, y_train)
+                                                   criterion='friedman_mse').fit(X_train, y_train)
 
                 y_pred = model.predict(X_test)
                 metrics.append(u.get_metrics(y_test, y_pred))
@@ -79,5 +80,5 @@ for feat in FEATS:
             }
             print("DONE - Results: {}\n".format(metrics_ent))
 
-        with open(RESULTS_PATH + 'results_' + feat.lower() + '_' + col.lower(), 'w') as fp:
+        with open(RESULTS_PATH + 'results_GBT_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
             json.dump(results, fp)

@@ -78,5 +78,5 @@ for feat in FEATS:
             }
             print("DONE - Results: {}\n".format(metrics_ent))
 
-        with open(RESULTS_PATH + 'results_' + feat.lower() + '_' + col.lower(), 'w') as fp:
+        with open(RESULTS_PATH + 'results_KNN_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
             json.dump(results, fp)
