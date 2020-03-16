@@ -21,7 +21,8 @@ def undersample(df, ratio_imbalance, col_target):
 
     return df.loc[idx, :].reset_index(drop=True)
 
-DATA_PATH = "data/"
+DATA_PATH = '/home/server/Aero/features/'
+RESULTS_PATH = '/home/server/Aero/results/'
 
 DATA_FILE = 'incoming_delays_nodes.csv'
 RESULTS_JSON = 'results_model_sergio.json'
@@ -106,7 +107,12 @@ for i, entity in enumerate(entities):
     y_pred = (model.predict(X_test) >= .5)*1
     metrics_ent = u.get_metrics_dict(u.get_metrics(y_test, y_pred))
 
-    results[entity] = metrics_ent
+    y_pred_val = (model.predict(X_val) >= .5) * 1
+
+    results[entity] = {
+        'unbal': metrics_ent,
+        'bal': u.get_metrics_dict(u.get_metrics(y_val, y_pred_val))
+    }
     print("DONE - Results: {}\n".format(metrics_ent))
 
     y_test_acc = np.concatenate([y_test_acc, y_test])
@@ -117,6 +123,6 @@ for i, entity in enumerate(entities):
 
 results['TOTAL'] = metrics_acc
 
-with open(DATA_PATH + RESULTS_JSON, 'w') as fp:
+with open(RESULTS_PATH + RESULTS_JSON, 'w') as fp:
     json.dump(results, fp)
 

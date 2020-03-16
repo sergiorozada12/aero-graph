@@ -7,7 +7,6 @@ from sklearn.model_selection import train_test_split
 
 import utils as u
 
-DATA_PATH = "data/"
 
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
 DATA_FILE_OD_PAIRS = 'incoming_delays_ods.csv'
@@ -56,7 +55,7 @@ for feat in FEATS:
             metrics_0s = []
             for j in range(ITERS):
                 X_0s, y_0s, X_train, y_train, X_test, y_test =\
-                    u.obtain_model_data(df_train, df_test, H, COL_DELAY, N_SAMPLES)
+                    u.obtain_training_data(df_train, df_test, H, COL_DELAY, N_SAMPLES)
                 X_train, X_no0s_bal, y_train, y_no0s_bal = train_test_split(X_train, y_train, test_size=0.15)
 
                 model = RandomForestClassifier(n_estimators=100,
@@ -75,9 +74,11 @@ for feat in FEATS:
 
             metrics_ent = u.get_metrics_dict(np.mean(metrics, axis=0))
 
-            results[entity]['unbal'] = metrics_ent
-            results[entity]['bal'] = u.get_metrics_dict(np.mean(metrics_bal, axis=0))
-            results[entity]['bal_zeros'] = u.get_metrics_dict(np.mean(metrics_0s, axis=0))
+            results[entity] = {
+                'unbal': metrics_ent,
+                'bal': u.get_metrics_dict(np.mean(metrics_bal, axis=0)),
+                'bal_zeros': u.get_metrics_dict(np.mean(metrics_0s, axis=0))
+            }
             print("DONE - Results: {}".format(metrics_ent))
 
         with open(RESULTS_PATH + 'results_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
