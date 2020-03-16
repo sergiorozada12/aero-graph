@@ -3,6 +3,7 @@ import json
 import numpy as np
 
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
 
 import utils as u
 
@@ -54,8 +55,12 @@ for feat in FEATS:
             df_test = df[df['YEAR'] == 2019][features[entity]['cols'] + ['y_clas']].reset_index(drop=True)
 
             metrics = []
+            metrics_bal = []
+            metrics_0s = []
             for j in range(ITERS):
-                X_train, y_train, X_test, y_test = u.obtain_training_data(df_train, df_test, H, COL_DELAY, N_SAMPLES)
+                X_0s, y_0s, X_train, y_train, X_test, y_test =\
+                    u.obtain_model_data(df_train, df_test, H, COL_DELAY, N_SAMPLES)
+                X_train, X_no0s_bal, y_train, y_no0s_bal = train_test_split(X_train, y_train, test_size=0.15)
 
                 model = RandomForestClassifier(n_estimators=100,
                                                max_depth=5,
@@ -64,12 +69,20 @@ for feat in FEATS:
 
                 y_pred = model.predict(X_test)
                 metrics.append(u.get_metrics(y_test, y_pred))
+                
+                y_pred_bal = model.predict(X_no0s_bal)
+                metrics_bal.append(u.get_metrics(y_no0s_bal, y_pred_bal))
+
+                y_pred_0s = model.predict(X_0s)
+                metrics_0s.append(u.get_metrics(y_0s, y_pred_0s))
 
             metrics_ent = u.get_metrics_dict(np.mean(metrics, axis=0))
 
-            results[entity] = metrics_ent
-            print("DONE - Results: {}\n".format(metrics_ent))
+            results[entity]['unbal'] = metrics_ent
+            results[entity]['bal'] = u.get_metrics_dict(np.mean(metrics_bal, axis=0))
+            results[entity]['bal_zeros'] = u.get_metrics_dict(np.mean(metrics_0s, axis=0))
+            print("DONE - Results: {}".format(metrics_ent))
 
-        with open(DATA_PATH + 'results_' + feat.lower() + '_' + col.lower(), 'w') as fp:
+        with open(DATA_PATH + 'results_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
             json.dump(results, fp)
 
