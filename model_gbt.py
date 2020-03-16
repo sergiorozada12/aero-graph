@@ -3,6 +3,7 @@ import json
 import numpy as np
 
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.model_selection import train_test_split
 
 
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
