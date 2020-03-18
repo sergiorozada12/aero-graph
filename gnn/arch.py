@@ -145,11 +145,14 @@ class GIGOArch(nn.Module):
 class BasicArch(nn.Module):
     def __init__(self,
                 S,
-                F,          # Features in each graph filter layer (list)
-                K,          # Filter taps in each graph filter layer
-                M,          # Neurons in each fully connected layer (list)
-                nonlin,     # Non linearity function
-                arch_info): # Print architecture information
+                F,                  # Features in each graph filter layer (list)
+                K,                  # Filter taps in each graph filter layer
+                M,                  # Neurons in each fully connected layer (list)
+                nonlin,             # Non linearity function
+                nonlin_mlp,         # Non linearity for MLP layers
+                dropout_mlp,        # Dropout in MLP layers
+                n_mlp_feat=0,       # Number of mlp extra features
+                arch_info=False):   # Print architecture information
         super(BasicArch, self).__init__()
         # In python 3
         # super()
@@ -164,6 +167,9 @@ class BasicArch(nn.Module):
         self.K = K
         self.M = M
         self.nonlin = nonlin
+        self.nonlin_mlp = nonlin_mlp
+        self.n_mlp_feat = n_mlp_feat
+        self.dropout_mlp = dropout_mlp
         self.l_param = []
 
         # Define the layer
@@ -183,7 +189,10 @@ class BasicArch(nn.Module):
         fcl = []
         # As last layer has no nonlin (if its softmax is done later, etc.)
         # define here the first layer before loop
-        firstLayerIn = self.N*self.F[-1]
+        if len(self.F) > 0:
+            firstLayerIn = self.N*self.F[-1] + self.n_mlp_feat
+        else:   # TO BE REMOVED
+            firstLayerIn = self.N*13 + self.n_mlp_feat
         if len(self.M) > 0:
             fcl.append(nn.Linear(firstLayerIn, self.M[0]))
             self.l_param.append('weights_fc_0')
@@ -191,7 +200,8 @@ class BasicArch(nn.Module):
             for m in range(1,len(self.M)):
                 # print("FC layer: " + str(m))
                 # print(str(self.M[m-1]) + ' x ' + str(self.M[m]))
-                fcl.append(self.nonlin())
+                fcl.append(self.nonlin_mlp())
+                fcl.append(nn.Dropout(self.dropout_mlp))
                 fcl.append(nn.Linear(self.M[m-1], self.M[m]))
                 self.l_param.append('weights_fc_' + str(m))
                 self.l_param.append('bias_fc_' + str(m))
@@ -204,7 +214,7 @@ class BasicArch(nn.Module):
             print("F: {}, K: {}, M: {}".format(self.F, self.K, self.M))
             print("Non lin: " + str(self.nonlin))
 
-    def forward(self, x):
+    def forward(self, x, mlp_features=None):
 
         #Check type
         if type(x) != torch.FloatTensor:
@@ -215,7 +225,7 @@ class BasicArch(nn.Module):
         try:
             Fin = x.shape[1]
             xN = x.shape[2]
-            assert Fin == self.F[0]
+            #assert Fin == self.F[0]
         except IndexError:
             xN = x.shape[1]
             Fin = 1
@@ -223,6 +233,8 @@ class BasicArch(nn.Module):
             assert self.F[0] == 1
 
         assert xN == self.N
+        assert mlp_features.shape[0] == T
+        assert mlp_features.shape[1] == self.n_mlp_feat
 
         # Define the forward pass
         # Graph filter layers
@@ -231,7 +243,11 @@ class BasicArch(nn.Module):
 
         # return y.squeeze(2)
 
-        y = y.reshape([T, self.N*self.F[-1]])
+        #y = y.reshape([T, self.N*self.F[-1]])
+        y = y.reshape([T, self.N*y.shape[1]])
+
+        if mlp_features != None:
+            y = torch.cat((y, mlp_features), 1)
 
         return self.FCL(y)
 

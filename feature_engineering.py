@@ -93,7 +93,7 @@ for d in DELAY_TYPES:
 print("----------------------------------------")
 print("Saving the data")
 
-df_avg_delays.to_csv(OUT_PATH + 'df_avg_delays.csv', sep='|', index=False, index_label=False)
+df_avg_delays.to_csv(OUT_PATH + 'avg_delays.csv', sep='|', index=False, index_label=False)
 df_d_types.to_csv(OUT_PATH + 'df_d_types.csv', sep='|', index=False, index_label=False)
 df_casted.to_csv(OUT_PATH + 'incoming_delays_ods.csv', sep='|', index=False, index_label=False)
 df_nodes.to_csv(OUT_PATH + 'incoming_delays_nodes.csv', sep='|', index=False, index_label=False)

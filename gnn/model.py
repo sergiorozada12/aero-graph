@@ -39,7 +39,7 @@ class Model:
     def count_params(self):
         return sum(p.numel() for p in self.arch.parameters() if p.requires_grad)
 
-    def fit(self, train_X, train_Y, val_X, val_Y):
+    def fit(self, train_X, train_Y, train_mlp_feat, val_X, val_Y, val_mlp_feat):
         n_samples = train_X.shape[0]
         n_steps = int(n_samples/self.batch_size)
 
@@ -54,11 +54,12 @@ class Model:
                 # Randomly select batches
                 idx = np.random.permutation(n_samples)[:self.batch_size]
                 batch_X = train_X[idx, :, :]
+                batch_mlp_feat = train_mlp_feat[idx,:]
                 batch_Y = train_Y[idx]
                 self.arch.zero_grad()
 
                 # Training step
-                predicted_Y = self.arch(batch_X)
+                predicted_Y = self.arch(batch_X, batch_mlp_feat)
                 training_loss = self.loss(predicted_Y, batch_Y)
                 # CHANGE!!!
                 training_loss.backward()
@@ -70,7 +71,7 @@ class Model:
 
             # Predict eval error
             with no_grad():
-                predicted_Y_eval = self.arch(val_X)
+                predicted_Y_eval = self.arch(val_X, val_mlp_feat)
                 eval_loss = self.loss(predicted_Y_eval, val_Y)
                 val_err[i-1] = eval_loss.detach().numpy()
             if eval_loss.data*1.005 < best_err:
@@ -99,12 +100,12 @@ class Model:
         for params in self.arch.state_dict():
             print(params, "\t", self.arch.state_dict()[params].requires_grad)
 
-    def test(self, test_X, test_Y):
+    def test(self, test_X, test_Y, test_mlp_feat):
         self.arch.eval()
         n_samples = test_Y.shape[0]
 
         # Loss
-        Y_hat = self.arch(test_X)
+        Y_hat = self.arch(test_X, test_mlp_feat)
         loss = self.loss(Y_hat, test_Y)
 
         sm = nn.Softmax(dim=1)

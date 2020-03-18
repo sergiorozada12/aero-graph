@@ -297,13 +297,13 @@ def get_features_df(df_ods, df_nodes, od_pairs, nodes):
 def get_delay_types_df(df_ods, df_nodes, d_types, od_pairs, nodes):
     dfs = []
     for d in d_types:
-        cols_od = [od + d for od in od_pairs]
+        cols_od = [od + '_' + d for od in od_pairs]
 
         d_type_df_od = pd.DataFrame(df_ods['MEAN_' + d].values.\
                         reshape(-1, od_pairs.shape[0]).astype(np.float32),
                         columns=cols_od)
 
-        cols_nodes = [n + d for n in nodes]
+        cols_nodes = [n + '_' + d for n in nodes]
 
         d_type_df_node = pd.DataFrame(df_nodes['MEAN_' + d].values.\
                             reshape(-1, nodes.shape[0]).astype(np.float32),
@@ -465,17 +465,23 @@ def get_metrics(y_test, y_pred):
             recall_score(y_test, y_pred),
             f1_score(y_test, y_pred)]
 
+def obtain_equal_idx(idx_0, idx_1, n_samples):
+    idx_1_repeated = np.repeat(idx_1, (n_samples // len(idx_1)) + 1)
+
+    idx_non_delay = np.random.choice(idx_0, n_samples // 2, replace=False)
+    idx_delay = np.random.choice(idx_1_repeated, n_samples // 2, replace=False)
+    return np.concatenate([idx_non_delay, idx_delay])
 
 def obtain_training_data(df_train, df_test, h, col_delay, n_samples):
+    df_ = df_train.copy()
+    idx = obtain_equal_idx(df_[df_['y_clas'] == 0].index, df_[df_['y_clas'] == 1].index, n_samples)
+
+    X_0 = df_.loc[idx, df_.columns[:-1]].values
+    y_0 = df_.loc[idx, df_.columns[-1]].values
+
     df_ = df_train.loc[df_train[col_delay].shift(-h).fillna(0) != 0]
 
-    df_delay = df_[df_['y_clas'] == 1]
-
-    idx_delay_repeated = np.repeat(df_delay.index, (n_samples // len(df_delay)) + 1)
-
-    idx_non_delay = np.random.choice(df_[df_['y_clas'] == 0].index, n_samples // 2, replace=False)
-    idx_delay = np.random.choice(idx_delay_repeated, n_samples // 2, replace=False)
-    idx = np.concatenate([idx_non_delay, idx_delay])
+    idx = obtain_equal_idx(df_[df_['y_clas'] == 0].index, df_[df_['y_clas'] == 1].index, n_samples)
 
     X_train = df_.loc[idx, df_train.columns[:-1]].values
     y_train = df_.loc[idx, df_train.columns[-1]].values
@@ -486,7 +492,8 @@ def obtain_training_data(df_train, df_test, h, col_delay, n_samples):
     scaler = MinMaxScaler()
     scaler.fit(X_train)
 
+    X_0 = scaler.transform(X_0)
     X_train = scaler.transform(X_train)
     X_test = scaler.transform(X_test)
 
-    return X_train, y_train, X_test, y_test
+    return X_0, y_0, X_train, y_train, X_test, y_test
