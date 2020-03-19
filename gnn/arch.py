@@ -233,8 +233,9 @@ class BasicArch(nn.Module):
             assert self.F[0] == 1
 
         assert xN == self.N
-        assert mlp_features.shape[0] == T
-        assert mlp_features.shape[1] == self.n_mlp_feat
+        if mlp_features is not None:
+            assert mlp_features.shape[0] == T
+            assert mlp_features.shape[1] == self.n_mlp_feat
 
         # Define the forward pass
         # Graph filter layers
@@ -246,7 +247,7 @@ class BasicArch(nn.Module):
         #y = y.reshape([T, self.N*self.F[-1]])
         y = y.reshape([T, self.N*y.shape[1]])
 
-        if mlp_features != None:
+        if mlp_features is not None:
             y = torch.cat((y, mlp_features), 1)
 
         return self.FCL(y)

@@ -25,7 +25,7 @@ ARCH_INFO = True
 DELAY_TYPES = ['CARRIER_DELAY', 'LATE_AIRCRAFT_DELAY', 'NAS_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY']
 
 
-def eval_arch(X_train, y_train, mlp_features_train, X_val, y_val, mlp_features_val, X_test, y_test, mlp_features_test, X_unbal, y_unbal, mlp_features_bal):
+def eval_arch(X_train, y_train, mlp_features_train, X_val, y_val, mlp_features_val, X_test, y_test, mlp_features_test, X_unbal, y_unbal, mlp_features_unbal):
     archit = BasicArch(**arch_params)
     model_params['arch'] = archit
 
@@ -44,29 +44,49 @@ def eval_arch(X_train, y_train, mlp_features_train, X_val, y_val, mlp_features_v
 
     print("Started Testing")
 
-    test_loss, accuracy, precision, recall = model.test(X_test, y_test, mlp_features_test)
-    loss_unbal, acc_unbal, prec_unbal, rec_unbal = model.test(X_unbal, y_unbal, mlp_features_bal)
-    dummy_accuracy = accuracy_score(y_test, torch.zeros(y_test.size()))
+    # test_loss, accuracy, precision, recall = model.test(X_test, y_test, mlp_features_test)
+    # loss_unbal, acc_unbal, prec_unbal, rec_unbal = model.test(X_unbal, y_unbal, mlp_features_bal)
+    # dummy_accuracy = accuracy_score(y_unbal, torch.zeros(y_unbal.size()))
+
+    # print("----- END -------")
+    # print("Test Loss: {} - Accuracy: {} - Precision: {} - Recall: {}".format(
+    #     test_loss, accuracy, precision, recall
+    # ))
+    # print("Unbalanced - Loss: {} - Accuracy: {} - Precision: {} - Recall: {} \
+    #     - Dummy Acc: {}".format(
+    #     loss_unbal, acc_unbal, prec_unbal, rec_unbal, dummy_accuracy
+    # ))
+
+    y_pred_bal = model.predict(X_test, mlp_features_test)
+    metrics_bal = u.get_metrics(y_test, y_pred_bal)
+
+    y_pred_unbal = model.predict(X_unbal, mlp_features_unbal)
+    metrics_unbal = u.get_metrics(y_unbal, y_pred_unbal)
 
     print("----- END -------")
-    print("Test Loss: {} - Accuracy: {} - Precision: {} - Recall: {} \
-            - Dummy Acc: {} - Accuracy Unbalanced: {}".format(
-        test_loss, accuracy, precision, recall, dummy_accuracy, acc_unbal
+    print("Balanced: Accuracy: {} - Precision: {} - Recall: {} - F1: {}".format(
+        metrics_bal[0], metrics_bal[1], metrics_bal[2], metrics_bal[3]
+    ))
+    print("Unbalanced: Accuracy: {} - Precision: {} - Recall: {} - F1: {}".format(
+        metrics_unbal[0], metrics_unbal[1], metrics_unbal[2], metrics_unbal[3]
     ))
 
-    results = {
-        'epochs': epochs,
-        'train_err': train_err,
-        'val_err': val_err,
-        'test_loss': test_loss,
-        'accuracy': accuracy,
-        'precision': precision,
-        'recall': recall,
-        'loss_unbal': loss_unbal,
-        'acc_unbal': acc_unbal,
-        'prec_unbal': prec_unbal,
-        'rec_unbal': rec_unbal
-    }
+    results = {}
+    results['bal'] = u.get_metrics_dict(metrics_bal)
+    results['unbal'] = u.get_metrics_dict(metrics_unbal)
+    # results = {
+    #     'epochs': epochs,
+    #     'train_err': mean_train_err,
+    #     'val_err': mean_val_err,
+    #     'test_loss': np.mean(test_loss),
+    #     'accuracy': accuracy,
+    #     'precision': precision,
+    #     'recall': recall,
+    #     'loss_unbal': loss_unbal,
+    #     'acc_unbal': acc_unbal,
+    #     'prec_unbal': prec_unbal,
+    #     'rec_unbal': rec_unbal
+    # }
 
     return results
 
@@ -174,7 +194,7 @@ df_test = df[df['YEAR'] == 2019].reset_index(drop=True)
 X_test_unbal = X[idx_work:,:,:]
 mlp_features_test_unbal = mlp_features[idx_work:,:]
 
-assert len(df_test) == X_test_unbal.shape[0]
+assert (len(df_test) // entities.shape[0]) == X_test_unbal.shape[0]
 
 results = {}
 for ent in entities:
@@ -208,5 +228,5 @@ for ent in entities:
                              torch.Tensor(mlp_features_test_unbal))
     #print("DONE - Test Loss: {} - Accuracy: {}".format(results[ent]['test_loss'], results[ent]['accuracy']))
 
-with open(RESULTS_PATH + '20200316-nodes-gnn.json', 'w') as f:
+with open(RESULTS_PATH + '20200319-nodes-gnn.json', 'w') as f:
     json.dump(results, f)
