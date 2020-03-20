@@ -1,3 +1,7 @@
+#!/bin/bash
+
+cd ..
+
 d=`date +%Y%m%d-%H%M`
 
 mkdir ../output/$d

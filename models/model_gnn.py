@@ -8,6 +8,9 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
+import sys
+sys.path.append('..')
+
 from gnn.model import Model, ADAM
 from gnn.arch import BasicArch
 

@@ -2,13 +2,13 @@ import pandas as pd
 import json
 import numpy as np
 
-import utils as u
-
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
 
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation
-from keras.callbacks import EarlyStopping
+import sys
+sys.path.append('..')
+
+import utils as u
 
 
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
@@ -20,7 +20,7 @@ RESULTS_PATH = '/home/server/Aero/results/'
 
 COLS = ['NODE', 'OD_PAIR']
 FEATS = ['LR', 'RF']
-N_SAMPLES = 4000
+N_SAMPLES = 3000
 COL_DELAY = 'MEAN_DELAY'
 H = 2
 ITERS = 10
@@ -61,41 +61,9 @@ for feat in FEATS:
                     u.obtain_training_data(df_train, df_test, H, COL_DELAY, N_SAMPLES)
                 X_train, X_no0s_bal, y_train, y_no0s_bal = train_test_split(X_train, y_train, test_size=0.15)
 
-                X_train, X_val, y_train, y_val = train_test_split(X_train, y_train,
-                                                                  test_size=0.2,
-                                                                  random_state=42,
-                                                                  shuffle=True)
+                model = KNeighborsClassifier(n_neighbors=5).fit(X_train, y_train)
 
-                try:
-                    features_out = y_train.shape[1]
-                except IndexError:
-                    features_out = 1
-
-                model = Sequential()
-                model.add(Dense(1000, activation='relu', input_dim=X_train.shape[1]))
-                model.add(Dropout(0.5))
-                model.add(Dense(1000, activation='relu'))
-                model.add(Dropout(0.5))
-                model.add(Dense(features_out, activation='sigmoid'))
-
-                model.compile(loss='binary_crossentropy',
-                              optimizer='adam',
-                              metrics=['accuracy'])
-
-                es = EarlyStopping(monitor='val_loss',
-                                   mode='min',
-                                   verbose=1,
-                                   patience=10)
-
-                history = model.fit(X_train,
-                                    y_train,
-                                    validation_data=(X_val, y_val),
-                                    epochs=100,
-                                    batch_size=128,
-                                    callbacks=[es],
-                                    shuffle=True)
-
-                y_pred = (model.predict(X_test) >= .5) * 1
+                y_pred = model.predict(X_test)
                 metrics.append(u.get_metrics(y_test, y_pred))
 
                 y_pred_bal = (model.predict(X_no0s_bal) >= .5) * 1
@@ -113,7 +81,5 @@ for feat in FEATS:
             }
             print("DONE - Results: {}\n".format(metrics_ent))
 
-        with open(RESULTS_PATH + 'results_MLP_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
+        with open(RESULTS_PATH + 'results_KNN_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
             json.dump(results, fp)
-
-
