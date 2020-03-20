@@ -2,11 +2,13 @@ import pandas as pd
 import json
 import numpy as np
 
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 
-import utils as u
+import sys
+sys.path.append('..')
 
+import utils as u
 
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
 DATA_FILE_OD_PAIRS = 'incoming_delays_ods.csv'
@@ -58,7 +60,10 @@ for feat in FEATS:
                     u.obtain_training_data(df_train, df_test, H, COL_DELAY, N_SAMPLES)
                 X_train, X_no0s_bal, y_train, y_no0s_bal = train_test_split(X_train, y_train, test_size=0.15)
 
-                model = KNeighborsClassifier(n_neighbors=5).fit(X_train, y_train)
+                model = GradientBoostingClassifier(n_estimators=100,
+                                                   max_depth=5,
+                                                   random_state=0,
+                                                   criterion='friedman_mse').fit(X_train, y_train)
 
                 y_pred = model.predict(X_test)
                 metrics.append(u.get_metrics(y_test, y_pred))
@@ -78,5 +83,5 @@ for feat in FEATS:
             }
             print("DONE - Results: {}\n".format(metrics_ent))
 
-        with open(RESULTS_PATH + 'results_KNN_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
+        with open(RESULTS_PATH + 'results_GBT_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
             json.dump(results, fp)
