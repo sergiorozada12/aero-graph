@@ -18,9 +18,9 @@ from keras.backend import clear_session
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
 DATA_FILE_OD_PAIRS = 'incoming_delays_ods.csv'
 DATA_FILE_DELAYS = 'avg_delays.csv'
-DATA_PATH = '/home/server/Aero/features/'
-FEATSEL_PATH = '/home/server/Aero/modelIn/'
-RESULTS_PATH = '/home/server/Aero/results/'
+DATA_PATH = '/home/victor/Aero_TFG/newCode/features/'
+FEATSEL_PATH = '/home/victor/Aero_TFG/newCode/modelIn/'
+RESULTS_PATH = '/home/victor/Aero_TFG/newCode/results/'
 
 COLS = ['OD_PAIR', 'NODE']
 FEATS = ['ALL', 'LR', 'RF']
@@ -51,8 +51,8 @@ for feat in FEATS:
 
             df_ent = df_1[df_1[col] == entity].reset_index(drop=True)
             df = pd.concat([df_ent, df_2], axis=1)
-
-            cols = df.columns.drop(['FL_DATE', col]) if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
+            print(df.columns)
+            cols = df.columns.drop(['FL_DATE', col], errors='ignore') if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
 
             df_train = df[df['YEAR'] == 2018][cols].reset_index(drop=True)
             df_test = df[df['YEAR'] == 2019][cols].reset_index(drop=True)
