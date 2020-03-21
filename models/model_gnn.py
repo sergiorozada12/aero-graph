@@ -78,9 +78,9 @@ def eval_arch(X_train, y_train, mlp_features_train, X_val, y_val, mlp_features_v
         metrics_unbal[0], metrics_unbal[1], metrics_unbal[2], metrics_unbal[3]
     ))
 
-    results = {}
-    results['bal'] = u.get_metrics_dict(metrics_bal)
-    results['unbal'] = u.get_metrics_dict(metrics_unbal)
+    # results = {}
+    # results['bal'] = u.get_metrics_dict(metrics_bal)
+    # results['unbal'] = u.get_metrics_dict(metrics_unbal)
     # results = {
     #     'epochs': epochs,
     #     'train_err': mean_train_err,
@@ -95,7 +95,7 @@ def eval_arch(X_train, y_train, mlp_features_train, X_val, y_val, mlp_features_v
     #     'rec_unbal': rec_unbal
     # }
 
-    return results
+    return metrics_bal, metrics_unbal
 
 def obtain_data(df, df_d_types, avg_delays, entities):
     cols_depart = [ent + '_DEP' for ent in entities]
@@ -157,6 +157,7 @@ PERM_COLS = ['HOUR',
 
 COLS = ['OD_PAIR', 'NODE']
 N_SAMPLES = 3000
+ITERS = 8
 
 # Architecture parameters
 arch_params = {}
@@ -216,32 +217,43 @@ for col in COLS:
         print("Entity: {} - ".format(ent))
         df_ent = df_work[df_work[col] == ent].reset_index(drop=True)
 
-        idx = u.obtain_equal_idx(df_ent[df_ent['y_clas'] == 0].index, df_ent[df_ent['y_clas'] == 1].index, N_SAMPLES)
+        metrics_bal = np.zeros((ITERS, 4))
+        metrics_unbal = np.zeros((ITERS, 4))
 
-        X_unbal = X[idx, :, :]
-        mlp_features_ent = mlp_features[idx,:]
-        y = df_ent.loc[idx, 'y_clas'].values
+        for i in range(ITERS):
 
-        X_train, X_test_bal, y_train, y_test_bal, mlp_features_train, mlp_features_test =\
-            train_test_split(X_unbal, y, mlp_features_ent, test_size=0.1)
-        X_train, X_val, y_train, y_val, mlp_features_train, mlp_features_val =\
-            train_test_split(X_train, y_train, mlp_features_train, test_size=0.12)
+            idx = u.obtain_equal_idx(df_ent[df_ent['y_clas'] == 0].index, df_ent[df_ent['y_clas'] == 1].index, N_SAMPLES)
 
-        y_unbal = df_test.loc[df_test[col] == ent, 'y_clas'].values
+            X_unbal = X[idx, :, :]
+            mlp_features_ent = mlp_features[idx,:]
+            y = df_ent.loc[idx, 'y_clas'].values
 
-        results[ent] = eval_arch(torch.Tensor(X_train),
-                                 torch.LongTensor(y_train),
-                                 torch.Tensor(mlp_features_train),
-                                 torch.Tensor(X_val),
-                                 torch.LongTensor(y_val),
-                                 torch.Tensor(mlp_features_val),
-                                 torch.Tensor(X_test_bal),
-                                 torch.LongTensor(y_test_bal),
-                                 torch.Tensor(mlp_features_test),
-                                 torch.Tensor(X_test_unbal),
-                                 torch.LongTensor(y_unbal),
-                                 torch.Tensor(mlp_features_test_unbal))
-        #print("DONE - Test Loss: {} - Accuracy: {}".format(results[ent]['test_loss'], results[ent]['accuracy']))
+            X_train, X_test_bal, y_train, y_test_bal, mlp_features_train, mlp_features_test =\
+                train_test_split(X_unbal, y, mlp_features_ent, test_size=0.1, shuffle=True)
+            X_train, X_val, y_train, y_val, mlp_features_train, mlp_features_val =\
+                train_test_split(X_train, y_train, mlp_features_train, test_size=0.12, shuffle=True)
+
+            y_unbal = df_test.loc[df_test[col] == ent, 'y_clas'].values
+
+            metrics_bal[i,:], metrics_unbal[i,:] = eval_arch(torch.Tensor(X_train),
+                                                         torch.LongTensor(y_train),
+                                                         torch.Tensor(mlp_features_train),
+                                                         torch.Tensor(X_val),
+                                                         torch.LongTensor(y_val),
+                                                         torch.Tensor(mlp_features_val),
+                                                         torch.Tensor(X_test_bal),
+                                                         torch.LongTensor(y_test_bal),
+                                                         torch.Tensor(mlp_features_test),
+                                                         torch.Tensor(X_test_unbal),
+                                                         torch.LongTensor(y_unbal),
+                                                         torch.Tensor(mlp_features_test_unbal))
+        metrics_ent = u.get_metrics_dict(np.mean(metrics_unbal, axis=0))
+
+        results[ent] = {
+            'unbal': metrics_ent,
+            'bal': u.get_metrics_dict(np.mean(metrics_bal, axis=0))
+        }
+        print("DONE - Results: {}\n".format(metrics_ent))
 
     with open(RESULTS_PATH + 'results_GNN_' + col.lower() + '.json', 'w') as f:
         json.dump(results, f)
