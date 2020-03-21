@@ -241,8 +241,8 @@ def create_od_pair_graph(od_pairs, path):
     degree = np.diag((adj.T@adj).diagonal())
     laplacian = degree - adj
 
-    np.save(path + "graph/Adj_OD", adj)
-    np.save(path + "graph/Lap_OD", laplacian)
+    np.save(path + "graph/Adj_od_pairs", adj)
+    np.save(path + "graph/Lap_Ood_pairs", laplacian)
     np.save(path + "graph/edges_od_pairs", np.array(edges))
 
 

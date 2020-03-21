@@ -17,6 +17,10 @@ from gnn.arch import BasicArch
 import utils as u
 
 
+DATA_FILE_NODES = 'incoming_delays_nodes.csv'
+DATA_FILE_OD_PAIRS = 'incoming_delays_ods.csv'
+DATA_FILE_DELAYS = 'avg_delays.csv'
+DATA_FILE_D_TYPES = 'df_d_types.csv'
 DATA_PATH = '/home/server/Aero/features/'
 FEATSEL_PATH = '/home/server/Aero/modelIn/'
 GRAPH_PATH = '/home/server/Aero/data/graph/'
@@ -135,16 +139,14 @@ def obtain_data(df, df_d_types, avg_delays, entities):
     return np.stack(features, axis=1), np.stack(mlp_features, axis=1)
 
 # Load the signal
-df = pd.read_csv(DATA_PATH + 'incoming_delays_nodes.csv', sep='|')
+df_nodes = pd.read_csv(DATA_PATH + DATA_FILE_NODES, sep='|')
 
-df_d_types = pd.read_csv(DATA_PATH + 'df_d_types.csv', sep='|')
+df_odpairs = pd.read_csv(DATA_PATH + DATA_FILE_OD_PAIRS, sep='|')
 
-avg_delays = pd.read_csv(DATA_PATH + 'avg_delays.csv', sep='|')
+df_d_types = pd.read_csv(DATA_PATH + DATA_FILE_D_TYPES, sep='|')
 
-# Load the graph
-S = np.load(GRAPH_PATH + 'Adj_nodes.npy', allow_pickle=True)
-S = S/np.sum(S)
-print(S)
+avg_delays = pd.read_csv(DATA_PATH + DATA_FILE_DELAYS, sep='|')
+
 
 PERM_COLS = ['HOUR',
              'DAY',
@@ -153,26 +155,18 @@ PERM_COLS = ['HOUR',
              'QUARTER',
              'SEASON']
 
-COL = 'NODE'
+COLS = ['OD_PAIR', 'NODE']
 N_SAMPLES = 3000
-
-entities = np.array(sorted(df[COL].unique()))
-
-# Obtain data
-X, mlp_features = obtain_data(df, df_d_types, avg_delays, entities)
-n_feats = X.shape[1]
 
 # Architecture parameters
 arch_params = {}
-arch_params['S'] = S
-arch_params['F'] = [n_feats, 32, 16, 8]
+arch_params['F'] = [None, 32, 16, 8]
 #arch_params['F'] = []
 arch_params['K'] = 3
 arch_params['M'] = [1024, 512, 64, 32, 2]
 arch_params['nonlin'] = nn.ReLU
 arch_params['nonlin_mlp'] = nn.ReLU
 arch_params['arch_info'] = ARCH_INFO
-arch_params['n_mlp_feat'] = mlp_features.shape[1]
 arch_params['dropout_mlp'] = 0.5
 
 # Model parameters
@@ -187,49 +181,67 @@ model_params['eval_freq'] = 4
 model_params['max_non_dec'] = 10
 model_params['verbose'] = VERB
 
-df_work = df[df['YEAR'] == 2018].reset_index(drop=True)
-idx_work = len(df_work) // entities.shape[0]
-print(len(df_work) / entities.shape[0])
-X_work = X[:idx_work,:,:]
-mlp_features_work = mlp_features[:idx_work,:]
+for col in COLS:
 
-df_test = df[df['YEAR'] == 2019].reset_index(drop=True)
-X_test_unbal = X[idx_work:,:,:]
-mlp_features_test_unbal = mlp_features[idx_work:,:]
+    df = df_nodes if col == 'NODE' else df_odpairs
 
-assert (len(df_test) // entities.shape[0]) == X_test_unbal.shape[0]
+    entities = np.array(sorted(df[col].unique()))
 
-results = {}
-for ent in entities:
-    print("Entity: {} - ".format(ent))
-    df_ent = df_work[df_work[COL] == ent].reset_index(drop=True)
+    # Load the graph
+    S = np.load(GRAPH_PATH + 'Adj_' + col.lower() + 's.npy', allow_pickle=True)
+    S = S / np.abs(np.linalg.eigvals(S)).max()
+    arch_params['S'] = S
 
-    idx = u.obtain_equal_idx(df_ent[df_ent['y_clas'] == 0].index, df_ent[df_ent['y_clas'] == 1].index, N_SAMPLES)
+    # Obtain data
+    X, mlp_features = obtain_data(df, df_d_types, avg_delays, entities)
+    if len(arch_params['F']) > 0:
+        n_feats = X.shape[1]
+        arch_params['F'][0] = n_feats
 
-    X_unbal = X[idx, :, :]
-    mlp_features_ent = mlp_features[idx,:]
-    y = df_ent.loc[idx, 'y_clas'].values
+    df_work = df[df['YEAR'] == 2018].reset_index(drop=True)
+    idx_work = len(df_work) // entities.shape[0]
+    X_work = X[:idx_work,:,:]
+    mlp_features_work = mlp_features[:idx_work,:]
 
-    X_train, X_test_bal, y_train, y_test_bal, mlp_features_train, mlp_features_test =\
-        train_test_split(X_unbal, y, mlp_features_ent, test_size=0.1)
-    X_train, X_val, y_train, y_val, mlp_features_train, mlp_features_val =\
-        train_test_split(X_train, y_train, mlp_features_train, test_size=0.12)
+    df_test = df[df['YEAR'] == 2019].reset_index(drop=True)
+    X_test_unbal = X[idx_work:,:,:]
+    mlp_features_test_unbal = mlp_features[idx_work:,:]
 
-    y_unbal = df_test.loc[df_test[COL] == ent, 'y_clas'].values
+    arch_params['n_mlp_feat'] = mlp_features.shape[1]
 
-    results[ent] = eval_arch(torch.Tensor(X_train),
-                             torch.LongTensor(y_train),
-                             torch.Tensor(mlp_features_train),
-                             torch.Tensor(X_val),
-                             torch.LongTensor(y_val),
-                             torch.Tensor(mlp_features_val),
-                             torch.Tensor(X_test_bal),
-                             torch.LongTensor(y_test_bal),
-                             torch.Tensor(mlp_features_test),
-                             torch.Tensor(X_test_unbal),
-                             torch.LongTensor(y_unbal),
-                             torch.Tensor(mlp_features_test_unbal))
-    #print("DONE - Test Loss: {} - Accuracy: {}".format(results[ent]['test_loss'], results[ent]['accuracy']))
+    assert (len(df_test) // entities.shape[0]) == X_test_unbal.shape[0]
 
-with open(RESULTS_PATH + '20200319-nodes-gnn.json', 'w') as f:
-    json.dump(results, f)
+    results = {}
+    for ent in entities:
+        print("Entity: {} - ".format(ent))
+        df_ent = df_work[df_work[col] == ent].reset_index(drop=True)
+
+        idx = u.obtain_equal_idx(df_ent[df_ent['y_clas'] == 0].index, df_ent[df_ent['y_clas'] == 1].index, N_SAMPLES)
+
+        X_unbal = X[idx, :, :]
+        mlp_features_ent = mlp_features[idx,:]
+        y = df_ent.loc[idx, 'y_clas'].values
+
+        X_train, X_test_bal, y_train, y_test_bal, mlp_features_train, mlp_features_test =\
+            train_test_split(X_unbal, y, mlp_features_ent, test_size=0.1)
+        X_train, X_val, y_train, y_val, mlp_features_train, mlp_features_val =\
+            train_test_split(X_train, y_train, mlp_features_train, test_size=0.12)
+
+        y_unbal = df_test.loc[df_test[col] == ent, 'y_clas'].values
+
+        results[ent] = eval_arch(torch.Tensor(X_train),
+                                 torch.LongTensor(y_train),
+                                 torch.Tensor(mlp_features_train),
+                                 torch.Tensor(X_val),
+                                 torch.LongTensor(y_val),
+                                 torch.Tensor(mlp_features_val),
+                                 torch.Tensor(X_test_bal),
+                                 torch.LongTensor(y_test_bal),
+                                 torch.Tensor(mlp_features_test),
+                                 torch.Tensor(X_test_unbal),
+                                 torch.LongTensor(y_unbal),
+                                 torch.Tensor(mlp_features_test_unbal))
+        #print("DONE - Test Loss: {} - Accuracy: {}".format(results[ent]['test_loss'], results[ent]['accuracy']))
+
+    with open(RESULTS_PATH + 'results_GNN_' + col.lower() + '.json', 'w') as f:
+        json.dump(results, f)
