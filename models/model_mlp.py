@@ -17,9 +17,9 @@ from keras.callbacks import EarlyStopping
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
 DATA_FILE_OD_PAIRS = 'incoming_delays_ods.csv'
 DATA_FILE_DELAYS = 'avg_delays.csv'
-DATA_PATH = '/home/victor/Aero_TFG/newCode/features/'
-FEATSEL_PATH = '/home/victor/Aero_TFG/newCode/modelIn/'
-RESULTS_PATH = '/home/victor/Aero_TFG/newCode/results/'
+DATA_PATH = '/home/server/Aero/features/'
+FEATSEL_PATH = '/home/server/Aero/modelIn/'
+RESULTS_PATH = '/home/server/Aero/results/'
 
 COLS = ['OD_PAIR', 'NODE']
 FEATS = ['ALL', 'LR', 'RF']
@@ -50,7 +50,6 @@ for feat in FEATS:
 
             df_ent = df_1[df_1[col] == entity].reset_index(drop=True)
             df = pd.concat([df_ent, df_2], axis=1)
-            print(df.columns)
             cols = df.columns.drop(['FL_DATE', col], errors='ignore') if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
 
             df_train = df[df['YEAR'] == 2018][cols].reset_index(drop=True)
@@ -96,7 +95,8 @@ for feat in FEATS:
                                     epochs=100,
                                     batch_size=128,
                                     callbacks=[es],
-                                    shuffle=True)
+                                    shuffle=True,
+                                    verbose=0)
 
                 y_pred = (model.predict(X_test) >= .5) * 1
                 metrics.append(u.get_metrics(y_test, y_pred))
