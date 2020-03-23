@@ -24,7 +24,7 @@ od_pairs = np.array(sorted(df_casted['OD_PAIR'].unique()))
 dates = np.array(sorted(df_casted['FL_DATE'].unique()))
 hours = np.array(sorted(df_casted['HOUR'].unique()))
 
-df_casted.drop(columns=['FL_DATE'], inplace=True)
+#df_casted.drop(columns=['FL_DATE'], inplace=True)
 
 df_avg_delays = u.get_features_df(df_casted, df_nodes, od_pairs, nodes)
 

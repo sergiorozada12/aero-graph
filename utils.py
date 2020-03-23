@@ -241,8 +241,8 @@ def create_od_pair_graph(od_pairs, path):
     degree = np.diag((adj.T@adj).diagonal())
     laplacian = degree - adj
 
-    np.save(path + "graph/Adj_OD", adj)
-    np.save(path + "graph/Lap_OD", laplacian)
+    np.save(path + "graph/Adj_od_pairs", adj)
+    np.save(path + "graph/Lap_Ood_pairs", laplacian)
     np.save(path + "graph/edges_od_pairs", np.array(edges))
 
 
@@ -476,18 +476,18 @@ def obtain_training_data(df_train, df_test, h, col_delay, n_samples):
     df_ = df_train.copy()
     idx = obtain_equal_idx(df_[df_['y_clas'] == 0].index, df_[df_['y_clas'] == 1].index, n_samples)
 
-    X_0 = df_.loc[idx, df_.columns[:-1]].values
-    y_0 = df_.loc[idx, df_.columns[-1]].values
+    X_0 = df_.loc[idx, df_.columns.drop('y_clas')].values
+    y_0 = df_.loc[idx, 'y_clas'].values
 
     df_ = df_train.loc[df_train[col_delay].shift(-h).fillna(0) != 0]
 
     idx = obtain_equal_idx(df_[df_['y_clas'] == 0].index, df_[df_['y_clas'] == 1].index, n_samples)
 
-    X_train = df_.loc[idx, df_train.columns[:-1]].values
-    y_train = df_.loc[idx, df_train.columns[-1]].values
+    X_train = df_.loc[idx, df_train.columns.drop('y_clas')].values
+    y_train = df_.loc[idx, 'y_clas'].values
 
-    X_test = df_test.values[:, :-1]
-    y_test = df_test.values[:, -1]
+    X_test = df_test.loc[:, df_test.columns.drop('y_clas')].values
+    y_test = df_test.loc[:, 'y_clas'].values
 
     scaler = MinMaxScaler()
     scaler.fit(X_train)
