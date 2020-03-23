@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation
 from keras.callbacks import EarlyStopping
+from keras.backend import clear_session
 
 
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
@@ -106,6 +107,8 @@ for feat in FEATS:
 
                 y_pred_0s = (model.predict(X_0s) >= .5) * 1
                 metrics_0s.append(u.get_metrics(y_0s, y_pred_0s))
+
+                clear_session()
 
             metrics_ent = u.get_metrics_dict(np.mean(metrics, axis=0))
 
