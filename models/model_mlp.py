@@ -50,6 +50,7 @@ for feat in FEATS:
             print("Entity: {} - ".format(entity), end="")
 
             df_ent = df_1[df_1[col] == entity].reset_index(drop=True)
+
             df = pd.concat([df_ent, df_2], axis=1)
             cols = df.columns.drop(['FL_DATE', col], errors='ignore') if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
 
@@ -75,6 +76,7 @@ for feat in FEATS:
                     features_out = 1
 
                 model = Sequential()
+
                 model.add(Dense(1000, activation='relu', input_dim=X_train.shape[1]))
                 model.add(Dropout(0.5))
                 model.add(Dense(1000, activation='relu'))
