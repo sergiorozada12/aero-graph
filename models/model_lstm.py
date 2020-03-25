@@ -2,6 +2,9 @@ import pandas as pd
 import json
 import numpy as np
 
+import sys
+sys.path.append('..')
+
 import utils as u
 
 from sklearn.model_selection import train_test_split
