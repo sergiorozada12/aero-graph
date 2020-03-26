@@ -52,7 +52,6 @@ for feat in FEATS:
             print("Entity: {} - ".format(entity), end="")
 
             df_ent = df_1[df_1[col] == entity].reset_index(drop=True)
-<<<<<<< HEAD:models/model_lstm.py
             df_ = pd.concat([df_ent, df_2], axis=1)
 
             columns = df_.columns
@@ -67,10 +66,6 @@ for feat in FEATS:
                         df.at[idx, c] = df_.loc[idx - N_STEPS + 1:idx, c].tolist()
 
             df = df.drop(df.index[0:N_STEPS - 1]).reset_index(drop=True)
-=======
-            df = pd.concat([df_ent, df_2], axis=1)
-            cols = df.columns.drop(['FL_DATE', col], errors='ignore') if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
->>>>>>> d16184982b69d2b2647ac8cef23a3f3894c5fc22:models/model_mlp.py
 
             df_train = df[df['YEAR'] == 2018][cols].reset_index(drop=True)
             df_test = df[df['YEAR'] == 2019][cols].reset_index(drop=True)

@@ -22,6 +22,7 @@ COLS = ['NODE', 'OD_PAIR']
 FEATS = ['ALL', 'LR', 'RF']
 N_SAMPLES = 3000
 COL_DELAY = 'MEAN_DELAY'
+COL_CLAS = 'y_clas'
 H = 2
 ITERS = 10
 
@@ -53,31 +54,33 @@ for feat in FEATS:
             df_train = df[df['YEAR'] == 2018][cols].reset_index(drop=True)
             df_test = df[df['YEAR'] == 2019][cols].reset_index(drop=True)
 
+            data = u.TrainingData(df_train, df_test, H, COL_DELAY, COL_CLAS)
+
             metrics = []
             metrics_bal = []
-            metrics_0s = []
+            metrics_assumption = []
             for j in range(ITERS):
-                X_0s, y_0s, X_train, y_train, X_test, y_test =\
-                    u.obtain_training_data(df_train, df_test, H, COL_DELAY, N_SAMPLES)
-                X_train, X_no0s_bal, y_train, y_no0s_bal = train_test_split(X_train, y_train, test_size=0.15)
+                X_train, y_train, X_test, y_test =\
+                    data.obtain_training_data(N_SAMPLES)
+                X_train, X_test_bal, y_train, y_test_bal = train_test_split(X_train, y_train, test_size=0.15)
 
                 model = KNeighborsClassifier(n_neighbors=5).fit(X_train, y_train)
 
                 y_pred = model.predict(X_test)
                 metrics.append(u.get_metrics(y_test, y_pred))
 
-                y_pred_bal = (model.predict(X_no0s_bal) >= .5) * 1
-                metrics_bal.append(u.get_metrics(y_no0s_bal, y_pred_bal))
+                y_pred_bal = model.predict(X_test_bal)
+                metrics_bal.append(u.get_metrics(y_test_bal, y_pred_bal))
 
-                y_pred_0s = (model.predict(X_0s) >= .5) * 1
-                metrics_0s.append(u.get_metrics(y_0s, y_pred_0s))
+                y_pred_assump = u.predict_assumption(data, model)
+                metrics_assumption.append(u.get_metrics(y_test, y_pred_assump))
 
             metrics_ent = u.get_metrics_dict(np.mean(metrics, axis=0))
 
             results[entity] = {
                 'unbal': metrics_ent,
                 'bal': u.get_metrics_dict(np.mean(metrics_bal, axis=0)),
-                'bal_zeros': u.get_metrics_dict(np.mean(metrics_0s, axis=0))
+                'assumption': u.get_metrics_dict(np.mean(metrics_assumption, axis=0))
             }
             print("DONE - Results: {}\n".format(metrics_ent))
 
