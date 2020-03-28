@@ -461,23 +461,31 @@ def get_metrics_dict(metrics_arr):
 
 
 def get_metrics(y_test, y_pred):
-    return [accuracy_score(y_test, y_pred),
-            precision_score(y_test, y_pred),
-            recall_score(y_test, y_pred),
-            f1_score(y_test, y_pred)]
+    accuracy = accuracy_score(y_test, y_pred)
+    if y_pred.sum() > 0 and y_test.sum() > 0:
+        precision = precision_score(y_test, y_pred)
+        recall = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
+    else:
+        precision = 0.
+        recall = 0.
+        f1 = 0.
+
+    return [accuracy,
+            precision,
+            recall,
+            f1]
 
 
 def predict_assumption(data, model):
     predictions = np.zeros(len(data.df_test))
 
-    cond_0s = data.df_test[data.col_delay] == 0
+    cond_0s = data.df_test[data.col_delay] <= 0
 
     df_pred = data.df_test.loc[~cond_0s]
     idx_p0 = df_pred.index
 
     X_test = df_pred.loc[:, data.df_test.columns.drop(data.col_labels)].values
-
-    y_test = data.df_test.loc[:, data.col_labels].values
 
     X_test = data.scale(X_test)
 
