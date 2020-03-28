@@ -2,14 +2,17 @@ import pandas as pd
 import json
 import numpy as np
 
+import sys
+sys.path.append('..')
+
 import utils as u
 
 from sklearn.model_selection import train_test_split
 
-from keras.layers import LSTM
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation
 from keras.callbacks import EarlyStopping
+from keras.backend import clear_session
 
 
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
@@ -19,13 +22,12 @@ DATA_PATH = '/home/server/Aero/features/'
 FEATSEL_PATH = '/home/server/Aero/modelIn/'
 RESULTS_PATH = '/home/server/Aero/results/'
 
-COLS = ['NODE', 'OD_PAIR']
-FEATS = ['LR', 'RF']
+COLS = ['OD_PAIR', 'NODE']
+FEATS = ['ALL', 'LR', 'RF']
 N_SAMPLES = 4000
 COL_DELAY = 'MEAN_DELAY'
 H = 2
 ITERS = 10
-N_STEPS = 3
 
 df_nodes = pd.read_csv(DATA_PATH + DATA_FILE_NODES, sep='|').fillna(0)
 df_odpairs = pd.read_csv(DATA_PATH + DATA_FILE_OD_PAIRS, sep='|').fillna(0)
@@ -35,40 +37,25 @@ for feat in FEATS:
 
     for col in COLS:
 
-        with open(FEATSEL_PATH + 'feat_{}_{}s.json'.format(feat.lower(), col.lower()), 'r') as f:
-            features = json.load(f)
+        if feat != 'ALL':
+            with open(FEATSEL_PATH + 'feat_{}_{}s.json'.format(feat.lower(), col.lower()), 'r') as f:
+                features = json.load(f)
 
-        if col == 'NODE':
-            df_1 = df_nodes
-            entities = np.array(sorted(df_1[col].unique()))
-        else:
-            df_1 = df_odpairs
-            entities = np.array(sorted(df_1[col].unique()))
+        df_1 = df_nodes if col == 'NODE' else df_odpairs
+        
+        entities = np.array(sorted(df_1[col].unique()))
 
         results = {}
         for i, entity in enumerate(entities):
             print("Entity: {} - ".format(entity), end="")
 
             df_ent = df_1[df_1[col] == entity].reset_index(drop=True)
-            df_ = pd.concat([df_ent, df_2], axis=1)
 
-            columns = df_.columns
-            df = df_.copy()
+            df = pd.concat([df_ent, df_2], axis=1)
+            cols = df.columns.drop(['FL_DATE', col], errors='ignore') if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
 
-            for c in columns:
-                df[c] = df[c].astype('object')
-
-            for idx, row in df_.iterrows():
-                for c in columns:
-                    if c != 'y_clas':
-                        df.at[idx, c] = df_.loc[idx - N_STEPS + 1:idx, c].tolist()
-
-            df = df.drop(df.index[0:N_STEPS - 1]).reset_index(drop=True)
-
-            df_train = df[df['YEAR'] == 2018][features[entity]['cols'] + ['y_clas']].reset_index(drop=True)
-            df_test = df[df['YEAR'] == 2019][features[entity]['cols'] + ['y_clas']].reset_index(drop=True)
-
-            n_cols_X = len(features[entity]['cols'])
+            df_train = df[df['YEAR'] == 2018][cols].reset_index(drop=True)
+            df_test = df[df['YEAR'] == 2019][cols].reset_index(drop=True)
 
             metrics = []
             metrics_bal = []
@@ -89,9 +76,8 @@ for feat in FEATS:
                     features_out = 1
 
                 model = Sequential()
-                model.add(LSTM(1000, input_shape=(N_STEPS, n_cols_X)))
-                model.add(Dropout(0.5))
-                model.add(Dense(1000, activation='relu'))
+
+                model.add(Dense(1000, activation='relu', input_dim=X_train.shape[1]))
                 model.add(Dropout(0.5))
                 model.add(Dense(1000, activation='relu'))
                 model.add(Dropout(0.5))
@@ -112,7 +98,8 @@ for feat in FEATS:
                                     epochs=100,
                                     batch_size=128,
                                     callbacks=[es],
-                                    shuffle=True)
+                                    shuffle=True,
+                                    verbose=0)
 
                 y_pred = (model.predict(X_test) >= .5) * 1
                 metrics.append(u.get_metrics(y_test, y_pred))
@@ -122,6 +109,8 @@ for feat in FEATS:
 
                 y_pred_0s = (model.predict(X_0s) >= .5) * 1
                 metrics_0s.append(u.get_metrics(y_0s, y_pred_0s))
+
+                clear_session()
 
             metrics_ent = u.get_metrics_dict(np.mean(metrics, axis=0))
 

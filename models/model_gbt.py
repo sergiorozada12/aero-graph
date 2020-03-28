@@ -5,6 +5,9 @@ import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 
+import sys
+sys.path.append('..')
+
 import utils as u
 
 DATA_FILE_NODES = 'incoming_delays_nodes.csv'
@@ -15,7 +18,7 @@ FEATSEL_PATH = '/home/server/Aero/modelIn/'
 RESULTS_PATH = '/home/server/Aero/results/'
 
 COLS = ['NODE', 'OD_PAIR']
-FEATS = ['LR', 'RF']
+FEATS = ['ALL', 'LR', 'RF']
 N_SAMPLES = 3000
 COL_DELAY = 'MEAN_DELAY'
 H = 2
@@ -29,15 +32,13 @@ for feat in FEATS:
 
     for col in COLS:
 
-        with open(FEATSEL_PATH + 'feat_{}_{}s.json'.format(feat.lower(), col.lower()), 'r') as f:
-            features = json.load(f)
+        if feat != 'ALL':
+            with open(FEATSEL_PATH + 'feat_{}_{}s.json'.format(feat.lower(), col.lower()), 'r') as f:
+                features = json.load(f)
 
-        if col == 'NODE':
-            df_1 = df_nodes
-            entities = np.array(sorted(df_1[col].unique()))
-        else:
-            df_1 = df_odpairs
-            entities = np.array(sorted(df_1[col].unique()))
+        df_1 = df_nodes if col == 'NODE' else df_odpairs
+        
+        entities = np.array(sorted(df_1[col].unique()))
 
         results = {}
         for i, entity in enumerate(entities):
@@ -46,8 +47,10 @@ for feat in FEATS:
             df_ent = df_1[df_1[col] == entity].reset_index(drop=True)
             df = pd.concat([df_ent, df_2], axis=1)
 
-            df_train = df[df['YEAR'] == 2018][features[entity]['cols'] + ['y_clas']].reset_index(drop=True)
-            df_test = df[df['YEAR'] == 2019][features[entity]['cols'] + ['y_clas']].reset_index(drop=True)
+            cols = df.columns.drop(['FL_DATE', col], errors='ignore') if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
+
+            df_train = df[df['YEAR'] == 2018][cols].reset_index(drop=True)
+            df_test = df[df['YEAR'] == 2019][cols].reset_index(drop=True)
 
             metrics = []
             metrics_bal = []

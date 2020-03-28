@@ -2,8 +2,11 @@ import pandas as pd
 import json
 import numpy as np
 
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
+
+import sys
+sys.path.append('..')
 
 import utils as u
 
@@ -16,7 +19,7 @@ FEATSEL_PATH = '/home/server/Aero/modelIn/'
 RESULTS_PATH = '/home/server/Aero/results/'
 
 COLS = ['NODE', 'OD_PAIR']
-FEATS = ['LR', 'RF']
+FEATS = ['ALL', 'LR', 'RF']
 N_SAMPLES = 3000
 COL_DELAY = 'MEAN_DELAY'
 H = 2
@@ -30,15 +33,13 @@ for feat in FEATS:
 
     for col in COLS:
 
-        with open(FEATSEL_PATH + 'feat_{}_{}s.json'.format(feat.lower(), col.lower()), 'r') as f:
-            features = json.load(f)
+        if feat != 'ALL':
+            with open(FEATSEL_PATH + 'feat_{}_{}s.json'.format(feat.lower(), col.lower()), 'r') as f:
+                features = json.load(f)
 
-        if col == 'NODE':
-            df_1 = df_nodes
-            entities = np.array(sorted(df_1[col].unique()))
-        else:
-            df_1 = df_odpairs
-            entities = np.array(sorted(df_1[col].unique()))
+        df_1 = df_nodes if col == 'NODE' else df_odpairs
+        
+        entities = np.array(sorted(df_1[col].unique()))
 
         results = {}
         for i, entity in enumerate(entities):
@@ -47,8 +48,10 @@ for feat in FEATS:
             df_ent = df_1[df_1[col] == entity].reset_index(drop=True)
             df = pd.concat([df_ent, df_2], axis=1)
 
-            df_train = df[df['YEAR'] == 2018][features[entity]['cols'] + ['y_clas']].reset_index(drop=True)
-            df_test = df[df['YEAR'] == 2019][features[entity]['cols'] + ['y_clas']].reset_index(drop=True)
+            cols = df.columns.drop(['FL_DATE', col], errors='ignore') if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
+
+            df_train = df[df['YEAR'] == 2018][cols].reset_index(drop=True)
+            df_test = df[df['YEAR'] == 2019][cols].reset_index(drop=True)
 
             metrics = []
             metrics_bal = []
@@ -58,15 +61,18 @@ for feat in FEATS:
                     u.obtain_training_data(df_train, df_test, H, COL_DELAY, N_SAMPLES)
                 X_train, X_no0s_bal, y_train, y_no0s_bal = train_test_split(X_train, y_train, test_size=0.15)
 
-                model = DecisionTreeClassifier(max_depth=15).fit(X_train, y_train)
+                model = RandomForestClassifier(n_estimators=100,
+                                               max_depth=5,
+                                               random_state=0,
+                                               criterion='gini').fit(X_train, y_train)
 
                 y_pred = model.predict(X_test)
                 metrics.append(u.get_metrics(y_test, y_pred))
-
-                y_pred_bal = (model.predict(X_no0s_bal) >= .5) * 1
+                
+                y_pred_bal = model.predict(X_no0s_bal)
                 metrics_bal.append(u.get_metrics(y_no0s_bal, y_pred_bal))
 
-                y_pred_0s = (model.predict(X_0s) >= .5) * 1
+                y_pred_0s = model.predict(X_0s)
                 metrics_0s.append(u.get_metrics(y_0s, y_pred_0s))
 
             metrics_ent = u.get_metrics_dict(np.mean(metrics, axis=0))
@@ -76,7 +82,8 @@ for feat in FEATS:
                 'bal': u.get_metrics_dict(np.mean(metrics_bal, axis=0)),
                 'bal_zeros': u.get_metrics_dict(np.mean(metrics_0s, axis=0))
             }
-            print("DONE - Results: {}\n".format(metrics_ent))
+            print("DONE - Results: {}".format(metrics_ent))
 
-        with open(RESULTS_PATH + 'results_DT_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
+        with open(RESULTS_PATH + 'results_RF_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
             json.dump(results, fp)
+

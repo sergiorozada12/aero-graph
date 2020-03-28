@@ -100,6 +100,16 @@ class Model:
         for params in self.arch.state_dict():
             print(params, "\t", self.arch.state_dict()[params].requires_grad)
 
+    def predict(self, X, mlp_feat=None):
+        self.arch.eval()
+
+        Y_hat = self.arch(X, mlp_feat)
+
+        sm = nn.Softmax(dim=1)
+        predictions = sm(Y_hat.detach()).argmax(dim=1)
+
+        return predictions
+
     def test(self, test_X, test_Y, test_mlp_feat):
         self.arch.eval()
         n_samples = test_Y.shape[0]
@@ -114,7 +124,7 @@ class Model:
         precision = precision_score(test_Y, predictions)
         recall = recall_score(test_Y, predictions)
 
-        return loss, accuracy, precision, recall
+        return loss.detach().item(), accuracy.detach().item(), precision, recall
 
 
 class LinearModel:
