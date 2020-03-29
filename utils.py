@@ -399,7 +399,8 @@ def get_feature_importance(df, type_selector, perm_cols, alt_cols, col_delay, h,
 
     feats_considered = np.array(alt_cols)[relevant_feat_idx]
     cols_ = perm_cols + list(feats_considered)
-
+    if 'MEAN_DELAY' not in cols_:
+        cols_.append('MEAN_DELAY')
     df = df.loc[:, cols_]
     cols_.remove('y_clas')
 
@@ -460,40 +461,79 @@ def get_metrics_dict(metrics_arr):
 
 
 def get_metrics(y_test, y_pred):
-    return [accuracy_score(y_test, y_pred),
-            precision_score(y_test, y_pred),
-            recall_score(y_test, y_pred),
-            f1_score(y_test, y_pred)]
+    accuracy = accuracy_score(y_test, y_pred)
+    if y_pred.sum() > 0 and y_test.sum() > 0:
+        precision = precision_score(y_test, y_pred)
+        recall = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
+    else:
+        precision = 0.
+        recall = 0.
+        f1 = 0.
 
-def obtain_equal_idx(idx_0, idx_1, n_samples):
-    idx_1_repeated = np.repeat(idx_1, (n_samples // len(idx_1)) + 1)
+    return [accuracy,
+            precision,
+            recall,
+            f1]
 
-    idx_non_delay = np.random.choice(idx_0, n_samples // 2, replace=False)
-    idx_delay = np.random.choice(idx_1_repeated, n_samples // 2, replace=False)
-    return np.concatenate([idx_non_delay, idx_delay])
 
-def obtain_training_data(df_train, df_test, h, col_delay, n_samples):
-    df_ = df_train.copy()
-    idx = obtain_equal_idx(df_[df_['y_clas'] == 0].index, df_[df_['y_clas'] == 1].index, n_samples)
+def predict_assumption(data, model):
+    predictions = np.zeros(len(data.df_test))
 
-    X_0 = df_.loc[idx, df_.columns.drop('y_clas')].values
-    y_0 = df_.loc[idx, 'y_clas'].values
+    cond_0s = data.df_test[data.col_delay] <= 0
 
-    df_ = df_train.loc[df_train[col_delay].shift(-h).fillna(0) != 0]
+    df_pred = data.df_test.loc[~cond_0s]
+    idx_p0 = df_pred.index
 
-    idx = obtain_equal_idx(df_[df_['y_clas'] == 0].index, df_[df_['y_clas'] == 1].index, n_samples)
+    X_test = df_pred.loc[:, data.df_test.columns.drop(data.col_labels)].values
 
-    X_train = df_.loc[idx, df_train.columns.drop('y_clas')].values
-    y_train = df_.loc[idx, 'y_clas'].values
+    X_test = data.scale(X_test)
 
-    X_test = df_test.loc[:, df_test.columns.drop('y_clas')].values
-    y_test = df_test.loc[:, 'y_clas'].values
+    y_pred = model.predict(X_test)
+    predictions[idx_p0] = y_pred
 
-    scaler = MinMaxScaler()
-    scaler.fit(X_train)
+    return predictions
 
-    X_0 = scaler.transform(X_0)
-    X_train = scaler.transform(X_train)
-    X_test = scaler.transform(X_test)
 
-    return X_0, y_0, X_train, y_train, X_test, y_test
+class TrainingData:
+    def __init__(self, df_train, df_test, h, col_delay, col_labels):
+        self.df_train = df_train
+        self.df_test = df_test
+        self.h = h
+        self.col_delay = col_delay
+        self.col_labels = col_labels
+
+        self.scaler = None
+
+    def obtain_training_data(self, n_samples):
+        df_ = self.df_train.loc[self.df_train[self.col_delay].shift(-self.h).fillna(0) != 0]
+
+        idx = self.obtain_equal_idx(df_[df_[self.col_labels] == 0].index,
+                                    df_[df_[self.col_labels] == 1].index,
+                                    n_samples)
+
+        X_train = df_.loc[idx, self.df_train.columns.drop(self.col_labels)].values
+        y_train = df_.loc[idx, self.col_labels].values
+
+        X_test = self.df_test.loc[:, self.df_test.columns.drop(self.col_labels)].values
+        y_test = self.df_test.loc[:, self.col_labels].values
+
+        self.scaler = MinMaxScaler()
+        self.scaler.fit(X_train)
+
+        X_train = self.scale(X_train)
+        X_test = self.scale(X_test)
+
+        return X_train, y_train, X_test, y_test
+
+    def scale(self, data):
+        if self.scaler == None:
+            raise RuntimeError("Scaler undefined")
+        return self.scaler.transform(data)
+
+    def obtain_equal_idx(self, idx_0, idx_1, n_samples):
+        idx_1_repeated = np.repeat(idx_1, (n_samples // len(idx_1)) + 1)
+
+        idx_non_delay = np.random.choice(idx_0, n_samples // 2, replace=False)
+        idx_delay = np.random.choice(idx_1_repeated, n_samples // 2, replace=False)
+        return np.concatenate([idx_non_delay, idx_delay])
