@@ -387,39 +387,21 @@ def make_lr_test(df, alpha, cols_to_select, col_delay, h, n_samples):
 
     return np.reshape(np.absolute(model_lr.coef_), -1)
 
+
 def get_feature_importance(df, type_selector, perm_cols, alt_cols, col_delay, h, n_samples):
     cols_to_select = perm_cols + alt_cols
     cols_to_select.remove('y_clas')
-    
-    # 100 more relevant features
-    feat_imp = make_rf_test(df, 15, cols_to_select, col_delay, h, n_samples) if type_selector == RF \
-          else make_lr_test(df, .1, cols_to_select, col_delay, h, n_samples)
-    del_idx = [cols_to_select.index(c) for c in alt_cols]
-    relevant_feat_idx = np.argsort(feat_imp[del_idx])[::-1][0:100]
 
-    feats_considered = np.array(alt_cols)[relevant_feat_idx]
-    cols_ = perm_cols + list(feats_considered)
-    if 'MEAN_DELAY' not in cols_:
-        cols_.append('MEAN_DELAY')
-    df = df.loc[:, cols_]
-    cols_.remove('y_clas')
-
-    # 10 more relevant features
-    feat_imp_arr = np.zeros((len(cols_), 10))
+    feat_imp_arr = np.zeros((len(cols_to_select), 10))
     for j in range(10):
-        feat_imp_arr[:,j] = make_rf_test(df, 100, cols_, col_delay, h, n_samples) if type_selector == RF \
-              else make_lr_test(df, .1, cols_, col_delay, h, n_samples)
+        feat_imp_arr[:, j] = make_rf_test(df, 100, cols_to_select, col_delay, h, n_samples) if type_selector == RF \
+              else make_lr_test(df, .1, cols_to_select, col_delay, h, n_samples)
 
     feat_imp_avg = np.mean(feat_imp_arr, axis=1)
+    idx = np.argsort(feat_imp_avg)[::-1]
 
-    del_idx_ = [cols_.index(n) for n in feats_considered]
-    relevant_feat_idx_ = np.argsort(feat_imp_avg[del_idx_])[::-1][0:10]
+    return np.array(cols_to_select)[idx].tolist(), feat_imp_avg[idx].tolist()
 
-    feats_considered_ = np.array(feats_considered)[relevant_feat_idx_]
-    cols_considered_ = perm_cols + list(feats_considered_)
-    cols_considered_.remove('y_clas')
-
-    return cols_considered_, feat_imp_avg[[cols_.index(c) for c in cols_considered_]].tolist()
 
 def feature_selection(df, entities, avg_delays, perm_cols, alt_cols, n_samples, col, out_path):
 
