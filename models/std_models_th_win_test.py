@@ -26,13 +26,15 @@ DATA_FILE_DELAYS = 'avg_delays.csv'
 DATA_PATH = '/home/server/Aero/features/'
 FEATSEL_PATH = '/home/server/Aero/modelIn/'
 RESULTS_PATH = '/home/server/Aero/results/'
-DATA_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\features\\"
-FEATSEL_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\modelIn\\"
-RESULTS_PATH = "C:\\Users\\victor\\Documents\\Aero_TFG\\results\\"
+# DATA_PATH = "E:\\TFG_VictorTenorio\\Aero_TFG\\features\\"
+# FEATSEL_PATH = "E:\\TFG_VictorTenorio\\Aero_TFG\\modelIn\\"
+# RESULTS_PATH = "E:\\TFG_VictorTenorio\\Aero_TFG\\results\\"
 
 COLS = ['NODE', 'OD_PAIR']
-THRESHOLDS = [30, 60, 120, 240]
+THRESHOLDS = [30, 60, 90]
+DEFAULT_TH = 60
 WINDOWS = [1, 2, 4, 6]
+DEFAULT_WIN = 2
 N_SAMPLES = 3000
 COL_DELAY = 'MEAN_DELAY'
 COL_CLAS = 'y_clas'
@@ -40,7 +42,7 @@ H = 2
 ITERS = 10
 
 def test_entity(m, entity, df_ent, df_2, cols):
-    print("Entity: {} - ".format(entity), end="")
+    #print("Entity: {} - ".format(entity), end="")
 
     df = pd.concat([df_ent, df_2], axis=1)
 
@@ -75,7 +77,7 @@ def test_entity(m, entity, df_ent, df_2, cols):
         'bal': u.get_metrics_dict(np.mean(metrics_bal, axis=0)),
         'assumption': u.get_metrics_dict(np.mean(metrics_assumption, axis=0))
     }
-    print("DONE {} - Results: {}\n".format(entity, metrics_ent))
+    #print("DONE {} - Results: {}\n".format(entity, metrics_ent))
 
     return results_ent
 
@@ -83,7 +85,7 @@ def test_entity(m, entity, df_ent, df_2, cols):
 if __name__ == '__main__':
     datestr = datetime.now().strftime("%Y%m%d-%H%M")
 
-    results_folder = RESULTS_PATH + datestr + 'std_models_allAlt/'
+    results_folder = RESULTS_PATH + datestr + 'std_models_THWin/'
     os.mkdir(results_folder)
 
     models = {
@@ -112,38 +114,79 @@ if __name__ == '__main__':
     feat = 'RF'
 
     for th in THRESHOLDS:
-        for win in WINDOWS:
-            for col in COLS:
 
-                # if feat != 'ALL':
-                with open(FEATSEL_PATH + 'feat_{}_{}s.json'.format(feat.lower(), col.lower()), 'r') as f:
-                    features = json.load(f)
+        for col in COLS:
 
-                df_1 = df_nodes if col == 'NODE' else df_odpairs
+            # if feat != 'ALL':
+            with open(FEATSEL_PATH + 'feat_{}_{}s.json'.format(feat.lower(), col.lower()), 'r') as f:
+                features = json.load(f)
 
-                entities = np.array(sorted(df_1[col].unique()))
+            df_1 = df_nodes if col == 'NODE' else df_odpairs
 
-                df_1 = u.get_label(df_1, th, win, entities.shape[0]).drop(columns='y_reg')
+            entities = np.array(sorted(df_1[col].unique()))
 
-                for name, model in models.items():
+            df_1 = u.get_label(df_1, th, DEFAULT_WIN, entities.shape[0]).drop(columns='y_reg')
 
-                    results = {}
+            for name, model in models.items():
 
-                    with Pool(processes=N_CPUS) as p:
-                        
-                        procs = {}
-                        for i, entity in enumerate(entities):
-                            print("Model: {} - Entity: {} - i: {}".format(name, entity, i))
-                            # cols = df.columns.drop(['FL_DATE', col], errors='ignore') if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
-                            cols = features[entity]['cols'] + ['y_clas']
-                            procs[entity] = p.apply_async(test_entity, args=[model,
-                                                        entity, df_1[df_1[col] == entity].reset_index(drop=True),
-                                                        df_2,
-                                                        cols])
+                results = {}
 
-                        for i, entity in enumerate(entities):
-                            results[entity] = procs[entity].get()
-                            print("Model: {}, Entity: {}, i: {}, Results: {}".format(name, entity, i, results[entity]['unbal']))
+                with Pool(processes=N_CPUS) as p:
+                    
+                    procs = {}
+                    for i, entity in enumerate(entities):
+                        #print("Model: {} - Entity: {} - i: {}".format(name, entity, i))
+                        # cols = df.columns.drop(['FL_DATE', col], errors='ignore') if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
+                        cols = features[entity]['cols'][:20] + ['y_clas']
+                        if 'MEAN_DELAY' not in cols:
+                            cols[-2] = 'MEAN_DELAY'
+                        procs[entity] = p.apply_async(test_entity, args=[model,
+                                                    entity, df_1[df_1[col] == entity].reset_index(drop=True),
+                                                    df_2,
+                                                    cols])
 
-                    with open(results_folder + 'results_' + name + '_' + feat.lower() + '_' + col.lower() + '.json', 'w') as fp:
-                        json.dump(results, fp)
+                    for i, entity in enumerate(entities):
+                        results[entity] = procs[entity].get()
+                        print("Model: {}, Entity: {}, i: {}, Results: {}".format(name, entity, i, results[entity]['unbal']))
+
+                with open(results_folder + 'results_' + name + '_TH' + str(th) + '_' + col.lower() + '.json', 'w') as fp:
+                    json.dump(results, fp)
+    
+
+    for win in WINDOWS:
+        for col in COLS:
+
+            # if feat != 'ALL':
+            with open(FEATSEL_PATH + 'feat_{}_{}s.json'.format(feat.lower(), col.lower()), 'r') as f:
+                features = json.load(f)
+
+            df_1 = df_nodes if col == 'NODE' else df_odpairs
+
+            entities = np.array(sorted(df_1[col].unique()))
+
+            df_1 = u.get_label(df_1, DEFAULT_TH, win, entities.shape[0]).drop(columns='y_reg')
+
+            for name, model in models.items():
+
+                results = {}
+
+                with Pool(processes=N_CPUS) as p:
+                    
+                    procs = {}
+                    for i, entity in enumerate(entities):
+                        #print("Model: {} - Entity: {} - i: {}".format(name, entity, i))
+                        # cols = df.columns.drop(['FL_DATE', col], errors='ignore') if feat == 'ALL' else (features[entity]['cols'] + ['y_clas'])
+                        cols = features[entity]['cols'][:20] + ['y_clas']
+                        if 'MEAN_DELAY' not in cols:
+                            cols[-2] = 'MEAN_DELAY'
+                        procs[entity] = p.apply_async(test_entity, args=[model,
+                                                    entity, df_1[df_1[col] == entity].reset_index(drop=True),
+                                                    df_2,
+                                                    cols])
+
+                    for i, entity in enumerate(entities):
+                        results[entity] = procs[entity].get()
+                        print("Model: {}, Entity: {}, i: {}, Results: {}".format(name, entity, i, results[entity]['unbal']))
+
+                with open(results_folder + 'results_' + name + '_WIN' + str(win) + '_' + col.lower() + '.json', 'w') as fp:
+                    json.dump(results, fp)
