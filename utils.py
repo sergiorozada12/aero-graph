@@ -487,30 +487,37 @@ class TrainingData:
 
         self.scaler = None
 
-    def obtain_training_data(self, n_samples):
+    def obtain_training_data(self, n_samples, lstm=False):
         df_ = self.df_train.loc[self.df_train[self.col_delay].shift(-self.h).fillna(0) != 0]
 
         idx = self.obtain_equal_idx(df_[df_[self.col_labels] == 0].index,
                                     df_[df_[self.col_labels] == 1].index,
                                     n_samples)
 
-        X_train = df_.loc[idx, self.df_train.columns.drop(self.col_labels)].values
+        if lstm:
+            # Need to do it like this to obtain a 3d array
+            # After that traspose to obtain Samples x T Steps x Features
+            X_train = np.array([df_.loc[idx, c].tolist() for c in self.df_train.columns if c != self.col_labels])
+            X_train = np.transpose(X_train, (1,2,0))
+            X_test = np.array([self.df_test.loc[:,c].tolist() for c in self.df_test.columns if c != self.col_labels])
+            X_test = np.transpose(X_test, (1,2,0))
+        else:
+            X_train = df_.loc[idx, self.df_train.columns.drop(self.col_labels)].values
+            X_test = self.df_test.loc[:, self.df_test.columns.drop(self.col_labels)].values
+            self.scaler = MinMaxScaler()
+            self.scaler.fit(X_train)
+
+            X_train = self.scale(X_train)
+            X_test = self.scale(X_test)
+
         y_train = df_.loc[idx, self.col_labels].values
-
-        X_test = self.df_test.loc[:, self.df_test.columns.drop(self.col_labels)].values
         y_test = self.df_test.loc[:, self.col_labels].values
-
-        self.scaler = MinMaxScaler()
-        self.scaler.fit(X_train)
-
-        X_train = self.scale(X_train)
-        X_test = self.scale(X_test)
 
         return X_train, y_train, X_test, y_test
 
     def scale(self, data):
         if self.scaler == None:
-            raise RuntimeError("Scaler undefined")
+            return data
         return self.scaler.transform(data)
 
     def obtain_equal_idx(self, idx_0, idx_1, n_samples):
