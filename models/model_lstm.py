@@ -23,9 +23,6 @@ DATA_FILE_DELAYS = 'avg_delays.csv'
 DATA_PATH = '/home/server/Aero/features/'
 FEATSEL_PATH = '/home/server/Aero/modelIn/'
 RESULTS_PATH = '/home/server/Aero/results/'
-DATA_PATH = "E:\\TFG_VictorTenorio\\Aero_TFG\\features\\"
-FEATSEL_PATH = "E:\\TFG_VictorTenorio\\Aero_TFG\\modelIn\\"
-RESULTS_PATH = "E:\\TFG_VictorTenorio\\Aero_TFG\\results\\"
 
 COLS = ['OD_PAIR', 'NODE']
 FEATS = ['RF']
@@ -135,14 +132,14 @@ for feat in FEATS:
                                     shuffle=True,
                                     verbose=0)
 
-                y_pred = np.squeeze((model.predict(X_test) >= .5) * 1)
+                y_pred = (model.predict(X_test) >= .5) * 1
 
                 metrics.append(u.get_metrics(y_test, y_pred))
 
-                y_pred_bal = np.squeeze((model.predict(X_test_bal) >= .5) * 1)
+                y_pred_bal = (model.predict(X_test_bal) >= .5) * 1
                 metrics_bal.append(u.get_metrics(y_test_bal, y_pred_bal))
 
-                # y_pred_assump = np.squeeze((u.predict_assumption(data, model) >= .5) * 1)
+                # y_pred_assump = (u.predict_assumption(data, model) >= .5) * 1
                 # metrics_assumption.append(u.get_metrics(y_test, y_pred_assump))
 
                 clear_session()
